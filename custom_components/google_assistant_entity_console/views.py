@@ -1,0 +1,274 @@
+import logging
+import os
+import re
+from aiohttp import web
+import yaml
+
+from homeassistant.components.http import HomeAssistantView
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import (
+    area_registry,
+    device_registry,
+    entity_registry,
+)
+from homeassistant.util import dt as dt_util
+
+from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+class Secret:
+    def __init__(self, value: str):
+        self.value = value
+
+class Include:
+    def __init__(self, value: str):
+        self.value = value
+
+def secret_representer(dumper, data):
+    return dumper.represent_scalar('!secret', data.value)
+
+def include_representer(dumper, data):
+    return dumper.represent_scalar('!include', data.value)
+
+# Register representers on SafeDumper
+yaml.SafeDumper.add_representer(Secret, secret_representer)
+yaml.SafeDumper.add_representer(Include, include_representer)
+
+
+async def async_fetch_entities_data(hass: HomeAssistant):
+    ent_reg = entity_registry.async_get(hass)
+    dev_reg = device_registry.async_get(hass)
+    area_reg = area_registry.async_get(hass)
+
+    # Build area name mapping
+    area_map = {area.id: area.name for area in area_reg.async_list_areas()}
+
+    # Build device mappings
+    device_area_map = {}
+    device_name_map = {}
+    for device in dev_reg.devices.values():
+        device_area_map[device.id] = device.area_id
+        device_name_map[device.id] = device.name_by_user or device.name
+
+    active_entities = []
+    for entry in ent_reg.entities.values():
+        # Filter out disabled and hidden entities
+        if entry.disabled_by or entry.hidden_by:
+            continue
+
+        entity_id = entry.entity_id
+        device_id = entry.device_id
+        domain = entity_id.split(".")[0]
+
+        # Resolve Area
+        area_id = entry.area_id
+        if not area_id and device_id:
+            area_id = device_area_map.get(device_id)
+        
+        area_name = "TBA"
+        if area_id:
+            area_name = area_map.get(area_id, "TBA")
+
+        # Resolve Display Name
+        display_name = entry.name
+        if not display_name and device_id:
+            display_name = device_name_map.get(device_id)
+        if not display_name:
+            display_name = entry.original_name
+        if not display_name:
+            # Fallback to formatting entity ID name part
+            name_part = entity_id.split(".")[-1]
+            display_name = name_part.replace("_", " ").title()
+
+        # Resolve should_expose
+        should_expose = False
+        if entry.options and "conversation" in entry.options:
+            should_expose = entry.options["conversation"].get("should_expose", False)
+
+        aliases = entry.aliases or []
+        platform = entry.platform or ""
+        device_class = entry.device_class or ""
+
+        active_entities.append({
+            "entity_id": entity_id,
+            "name": entry.name,
+            "original_name": entry.original_name,
+            "display_name": display_name,
+            "device_class": device_class,
+            "platform": platform,
+            "should_expose": should_expose,
+            "area": area_name,
+            "domain": domain,
+            "aliases": list(aliases)
+        })
+
+    return active_entities
+
+
+class EntitiesView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/entities"
+    name = "api:google_assistant_entity_console:entities"
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            entities = await async_fetch_entities_data(hass)
+            return self.json(entities)
+        except Exception as err:
+            _LOGGER.exception("Failed to fetch entities registry")
+            return self.json({"error": str(err)}, status=500)
+
+
+class UpdateEntityView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/entities/update"
+    name = "api:google_assistant_entity_console:entities:update"
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+            entity_id = body.get("entity_id")
+            name = body.get("name")
+            aliases = body.get("aliases")
+            should_expose = body.get("should_expose")
+
+            if not entity_id:
+                return self.json({"error": "Missing entity_id"}, status=400)
+
+            ent_reg = entity_registry.async_get(hass)
+            entry = ent_reg.async_get(entity_id)
+            if not entry:
+                return self.json({"error": f"Entity {entity_id} not found"}, status=404)
+
+            # Update entry details
+            ent_reg.async_update_entity(
+                entity_id,
+                name=name if name else None,
+                aliases=set(aliases) if aliases is not None else None
+            )
+
+            # Update conversation (exposure) option namespace
+            ent_reg.async_update_entity_options(
+                entity_id,
+                "conversation",
+                {"should_expose": bool(should_expose)}
+            )
+
+            return self.json({"success": True})
+        except Exception as err:
+            _LOGGER.exception("Failed to update entity settings")
+            return self.json({"error": str(err)}, status=500)
+
+
+class SyncView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/sync"
+    name = "api:google_assistant_entity_console:sync"
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            now = dt_util.now()
+            date_str = now.strftime("%m%d%y")
+            filename = f"gaGen_{date_str}.yaml"
+            filepath = hass.config.path(filename)
+
+            active_entities = await async_fetch_entities_data(hass)
+
+            # Sort entities by area, domain, entity_id
+            sorted_entities = sorted(
+                active_entities,
+                key=lambda x: (x["area"] or "TBA", x["domain"], x["entity_id"])
+            )
+
+            entity_config = {}
+            for entity in sorted_entities:
+                if entity["should_expose"]:
+                    cfg = {
+                        "expose": True,
+                        "name": entity["display_name"]
+                    }
+                    if entity["aliases"]:
+                        cfg["aliases"] = entity["aliases"]
+                    if entity["area"] and entity["area"] != "TBA":
+                        cfg["room"] = entity["area"]
+                    entity_config[entity["entity_id"]] = cfg
+
+            ga_config = {
+                "project_id": Secret("googleassistant_projectName"),
+                "service_account": Include("homeassistantdocker-3f199-994a25247393.json"),
+                "report_state": True,
+                "secure_devices_pin": Secret("google_device_pin"),
+                "expose_by_default": False,
+                "entity_config": entity_config
+            }
+
+            # Generate YAML
+            yaml_string = yaml.dump(ga_config, Dumper=yaml.SafeDumper, sort_keys=False, width=1000)
+
+            # Post-process to remove quotes from !secret and !include
+            cleaned_yaml = yaml_string
+            cleaned_yaml = re.sub(r"!secret '([^']+)'", r"!secret \1", cleaned_yaml)
+            cleaned_yaml = re.sub(r"!include '([^']+)'", r"!include \1", cleaned_yaml)
+
+            # Syntax validation step
+            class CustomLoader(yaml.SafeLoader):
+                pass
+            CustomLoader.add_constructor('!secret', lambda loader, node: node.value)
+            CustomLoader.add_constructor('!include', lambda loader, node: node.value)
+
+            try:
+                yaml.load(cleaned_yaml, Loader=CustomLoader)
+            except Exception as val_err:
+                return self.json({"error": f"Generated YAML failed validation: {val_err}"}, status=500)
+
+            # Write file
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(cleaned_yaml)
+
+            # Dynamically update configuration.yaml
+            config_path = hass.config.path("configuration.yaml")
+            if os.path.exists(config_path):
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config_content = f.read()
+                
+                include_pattern = r"google_assistant:\s*!include\s*gaGen_\d{6}\.yaml"
+                if re.search(include_pattern, config_content):
+                    config_content = re.sub(
+                        include_pattern,
+                        f"google_assistant: !include {filename}",
+                        config_content
+                    )
+                    with open(config_path, "w", encoding="utf-8") as f:
+                        f.write(config_content)
+                else:
+                    _LOGGER.warning("Could not find google_assistant !include line in configuration.yaml")
+
+            # Reload Home Assistant core configuration
+            try:
+                await hass.services.async_call(
+                    "homeassistant",
+                    "reload_core_config",
+                    blocking=True
+                )
+            except Exception as err:
+                _LOGGER.error("Failed to reload core config: %s", err)
+
+            # Request Google Assistant sync
+            try:
+                await hass.services.async_call(
+                    "google_assistant",
+                    "request_sync",
+                    blocking=True
+                )
+            except Exception as err:
+                _LOGGER.error("Failed to request Google Assistant sync: %s", err)
+
+            return self.json({
+                "success": True,
+                "exposed_count": len(entity_config),
+                "yaml_written": filepath
+            })
+        except Exception as err:
+            _LOGGER.exception("Failed to sync configs")
+            return self.json({"error": str(err)}, status=500)

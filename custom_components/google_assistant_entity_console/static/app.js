@@ -25,6 +25,24 @@ const addAliasBtn = document.getElementById('addAliasBtn');
 const aliasBadgesContainer = document.getElementById('aliasBadgesContainer');
 const modalExposedCheckbox = document.getElementById('modalExposedCheckbox');
 
+// Get auth headers from URL token parameter or session storage
+function getAuthHeaders() {
+    const params = new URLSearchParams(window.location.search);
+    let token = params.get('token');
+    if (token) {
+        sessionStorage.setItem('ha_token', token);
+    } else {
+        token = sessionStorage.getItem('ha_token');
+    }
+    
+    if (token) {
+        return {
+            'Authorization': `Bearer ${token}`
+        };
+    }
+    return {};
+}
+
 // Init
 document.addEventListener('DOMContentLoaded', () => {
     fetchEntities();
@@ -35,7 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
 async function fetchEntities() {
     showTableLoading();
     try {
-        const response = await fetch('/api/entities');
+        const response = await fetch('/api/google_assistant_entity_console/entities', {
+            headers: getAuthHeaders()
+        });
         if (!response.ok) throw new Error('Failed to fetch entities');
         entities = await response.json();
         
@@ -49,7 +69,7 @@ async function fetchEntities() {
         showToast('Error loading entities: ' + error.message, 'error');
         entityTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 3rem 0;">
             <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>
-            Error loading entity registry. Ensure the backend is running.
+            Error loading entity registry. Ensure Home Assistant integration is active.
         </td></tr>`;
     }
 }
@@ -247,17 +267,18 @@ async function handleEditSubmit(e) {
     };
     
     try {
-        const response = await fetch('/api/entities/update', {
+        const response = await fetch('/api/google_assistant_entity_console/entities/update', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
             },
             body: JSON.stringify(updatePayload)
         });
         
         if (!response.ok) {
             const err = await response.json();
-            throw new Error(err.detail || 'Failed to update entity');
+            throw new Error(err.error || 'Failed to update entity');
         }
         
         // Update local state
@@ -285,17 +306,18 @@ async function handleSync() {
     icon.className = 'fa-solid fa-spinner fa-spin';
     
     try {
-        const response = await fetch('/api/sync', {
+        const response = await fetch('/api/google_assistant_entity_console/sync', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
             },
             body: JSON.stringify({})
         });
         
         if (!response.ok) {
             const err = await response.json();
-            throw new Error(err.detail || 'Sync failed');
+            throw new Error(err.error || 'Sync failed');
         }
         
         const result = await response.json();
