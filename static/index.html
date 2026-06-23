@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Assistant Entity Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <i class="fa-brands fa-google-assistant logo-icon"></i>
+                <div class="logo-text">
+                    <h1>Google Assistant</h1>
+                    <span>Entity Console</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="syncBtn" class="btn btn-primary">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>Sync & Rebuild</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Overview -->
+        <section class="stats-container">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-list-check"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Total Entities</span>
+                    <h2 id="totalEntities">0</h2>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon success"><i class="fa-solid fa-eye"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Exposed to Google</span>
+                    <h2 id="exposedEntities">0</h2>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon info"><i class="fa-solid fa-file-code"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Config File</span>
+                    <h2 id="configFile" style="font-size: 1.1rem; line-height: 1.8;">gaGen_112225.yaml</h2>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filter & Search Controls -->
+        <section class="controls-container">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="searchInput" placeholder="Search by name, ID or alias...">
+            </div>
+            <div class="filters">
+                <select id="domainFilter" class="filter-select">
+                    <option value="all">All Domains</option>
+                    <option value="light">Lights</option>
+                    <option value="switch">Switches</option>
+                    <option value="media_player">Media Players</option>
+                    <option value="fan">Fans</option>
+                    <option value="sensor">Sensors</option>
+                    <option value="binary_sensor">Binary Sensors</option>
+                    <option value="cover">Covers</option>
+                </select>
+                <select id="roomFilter" class="filter-select">
+                    <option value="all">All Rooms</option>
+                </select>
+                <div class="toggle-container">
+                    <label class="switch-toggle">
+                        <input type="checkbox" id="exposedOnlyCheckbox">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="toggle-label">Exposed Only</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content (Table) -->
+        <main class="table-container">
+            <table id="entityTable">
+                <thead>
+                    <tr>
+                        <th width="30%">Entity ID</th>
+                        <th width="25%">Friendly Name</th>
+                        <th width="15%">Room / Area</th>
+                        <th width="20%">Aliases</th>
+                        <th width="10%" style="text-align: center;">Exposed</th>
+                        <th width="10%" style="text-align: center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="entityTableBody">
+                    <tr>
+                        <td colspan="6" class="loading-state">
+                            <div class="spinner"></div>
+                            <span>Loading Home Assistant registry...</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </main>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Google Assistant Settings</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="modalEntityId">
+                <div class="form-group">
+                    <label>Entity ID</label>
+                    <input type="text" id="modalEntityIdDisplay" disabled class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="modalFriendlyName">Friendly Name Override</label>
+                    <input type="text" id="modalFriendlyName" placeholder="Default name" class="form-input">
+                    <small>Override name sent to Google Home. Leave blank to use default.</small>
+                </div>
+                <div class="form-group">
+                    <label>Aliases</label>
+                    <div id="aliasBadgesContainer" class="alias-badges-container"></div>
+                    <div class="alias-input-wrapper">
+                        <input type="text" id="modalAliasInput" placeholder="Add an alias..." class="form-input">
+                        <button type="button" id="addAliasBtn" class="btn btn-secondary">Add</button>
+                    </div>
+                    <small>Alt names Google Assistant will recognize (e.g. "Overhead Light").</small>
+                </div>
+                <div class="form-group toggle-group">
+                    <div class="toggle-container">
+                        <label class="switch-toggle">
+                            <input type="checkbox" id="modalExposedCheckbox">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label font-medium">Expose to Google Assistant</span>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
