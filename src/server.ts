@@ -53,6 +53,8 @@ interface HAEntity {
   };
   platform?: string;
   device_class?: string;
+  disabled_by?: string | null;
+  hidden_by?: string | null;
 }
 
 interface HADevice {
@@ -78,7 +80,9 @@ async function fetchRegistries() {
   const deviceAreaMap = new Map(devices.map(d => [d.id, d.area_id]));
   const deviceNameMap = new Map(devices.map(d => [d.id, d.name_by_user || d.name]));
   
-  return entities.map(entity => {
+  const activeEntities = entities.filter(entity => !entity.disabled_by && !entity.hidden_by);
+  
+  return activeEntities.map(entity => {
     const entity_id = entity.entity_id;
     const device_id = entity.device_id;
     
