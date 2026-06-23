@@ -241,6 +241,14 @@ app.post('/api/sync', async (req, res) => {
     cleanedYaml = cleanedYaml.replace(/!secret '([^']+)'/g, '!secret $1');
     cleanedYaml = cleanedYaml.replace(/!include '([^']+)'/g, '!include $1');
     
+    // Syntax validation step
+    try {
+      yaml.load(cleanedYaml, { schema: CUSTOM_SCHEMA });
+      console.log('YAML syntax validated successfully');
+    } catch (valErr: any) {
+      throw new Error(`Generated YAML failed syntax validation: ${valErr.message}`);
+    }
+
     // Ensure dir exists
     const dir = path.dirname(filepath);
     if (!fs.existsSync(dir)) {
