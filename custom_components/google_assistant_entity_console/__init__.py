@@ -1,5 +1,6 @@
 import logging
 from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.frontend import (
     async_register_built_in_panel,
     async_remove_panel,
@@ -12,8 +13,12 @@ from .views import EntitiesView, UpdateEntityView, SyncView
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the Google Assistant Entity Console component."""
-    _LOGGER.info("Setting up Google Assistant Entity Console")
+    """Set up the Google Assistant Entity Console component (legacy YAML fallback)."""
+    return True
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up the Google Assistant Entity Console from a config entry."""
+    _LOGGER.info("Setting up Google Assistant Entity Console from config entry")
 
     # 1. Register static files directory
     static_dir = hass.config.path("custom_components/google_assistant_entity_console/static")
@@ -48,4 +53,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
         },
     )
 
+    return True
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    _LOGGER.info("Unloading Google Assistant Entity Console config entry")
+    async_remove_panel(hass, DOMAIN, warn_if_unknown=False)
     return True

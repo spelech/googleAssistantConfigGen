@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Google Assistant Entity Console",
+        "description": "Do you want to configure the Google Assistant Entity Console?"
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only a single instance of this integration is allowed."
+    }
+  }
+}
