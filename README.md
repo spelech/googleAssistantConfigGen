@@ -1,5 +1,9 @@
 # Google Assistant Entity Console
 
+<p align="center">
+  <img src="logo.png" alt="Google Sync Logo" width="200" height="200">
+</p>
+
 Google Assistant Entity Console is a native Home Assistant custom component that provides a sidebar dashboard UI to manage which entities are exposed to Google Assistant, update their friendly names and aliases, generate the configuration YAML, and trigger reloads and syncs.
 
 It replaces standalone proxy containers and connects directly to Home Assistant registries.
