@@ -183,9 +183,16 @@ const includeType = new yaml.Type('!include', {
 const CUSTOM_SCHEMA = yaml.DEFAULT_SCHEMA.extend([secretType, includeType]);
 
 app.post('/api/sync', async (req, res) => {
-  const filepath = '/config/gaGen_112225.yaml';
-  
   try {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const dateStr = `${month}${day}${year}`;
+    
+    const filename = `gaGen_${dateStr}.yaml`;
+    const filepath = path.join('/config', filename);
+
     const entities = await fetchRegistries();
     
     // Sort entities first by area, then by domain
@@ -241,20 +248,44 @@ app.post('/api/sync', async (req, res) => {
     }
     
     fs.writeFileSync(filepath, cleanedYaml, 'utf8');
-    
-    // Request Sync in HA
+    console.log(`Wrote new configuration to ${filepath}`);
+
+    const conn = await getHAConnection();
+
+    // Dynamically update configuration.yaml
+    const configPath = '/config/configuration.yaml';
+    if (fs.existsSync(configPath)) {
+      let configContent = fs.readFileSync(configPath, 'utf8');
+      const includeRegex = /google_assistant:\s*!include\s*gaGen_\d{6}\.yaml/;
+      if (includeRegex.test(configContent)) {
+        configContent = configContent.replace(includeRegex, `google_assistant: !include ${filename}`);
+        fs.writeFileSync(configPath, configContent, 'utf8');
+        console.log(`Updated configuration.yaml to include ${filename}`);
+      } else {
+        console.warn('Could not find google_assistant !include line in configuration.yaml');
+      }
+    }
+
+    // Reload core configuration in HA
     try {
-      await axios.post(
-        `${HA_URL}/api/services/google_assistant/request_sync`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${HA_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        }
-      );
+      console.log('Reloading Home Assistant core configuration...');
+      await conn.sendMessagePromise({
+        type: 'call_service',
+        domain: 'homeassistant',
+        service: 'reload_core_config'
+      });
+    } catch (err: any) {
+      console.error('Failed to reload core config:', err.message);
+    }
+
+    // Request Sync in HA (using WebSocket service call)
+    try {
+      console.log('Requesting Google Assistant sync...');
+      await conn.sendMessagePromise({
+        type: 'call_service',
+        domain: 'google_assistant',
+        service: 'request_sync'
+      });
     } catch (err: any) {
       console.error('Failed to trigger HA request_sync service:', err.message);
     }
