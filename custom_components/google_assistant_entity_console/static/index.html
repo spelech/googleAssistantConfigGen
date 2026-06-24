@@ -167,6 +167,8 @@
     <div id="toast" class="toast"></div>
 
     <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const ver = urlParams.get('v') || Date.now();
         const appScript = document.createElement('script');
         appScript.src = `app.js?v=${ver}`;
         document.body.appendChild(appScript);
