@@ -3,6 +3,7 @@ let entities = [];
 let filteredEntities = [];
 let rooms = [];
 let currentAliases = [];
+const collapsedGroups = new Set();
 
 // DOM Elements
 const totalEntitiesEl = document.getElementById('totalEntities');
@@ -80,7 +81,7 @@ async function fetchEntities() {
         applyFilters();
     } catch (error) {
         showToast('Error loading entities: ' + error.message, 'error');
-        entityTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 3rem 0;">
+        entityTableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--danger); padding: 3rem 0;">
             <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>
             Error loading entity registry. Ensure Home Assistant integration is active.
         </td></tr>`;
@@ -134,7 +135,7 @@ function populateRoomFilter(uniqueRooms) {
 function showTableLoading() {
     entityTableBody.innerHTML = `
         <tr>
-            <td colspan="5" class="loading-state">
+            <td colspan="4" class="loading-state">
                 <div class="spinner"></div>
                 <span>Loading entity registry...</span>
             </td>
@@ -171,11 +172,21 @@ function applyFilters() {
     renderTable();
 }
 
+window.toggleGroup = function(groupKey, event) {
+    if (event) event.stopPropagation();
+    if (collapsedGroups.has(groupKey)) {
+        collapsedGroups.delete(groupKey);
+    } else {
+        collapsedGroups.add(groupKey);
+    }
+    renderTable();
+};
+
 function renderTable() {
     if (filteredEntities.length === 0) {
         entityTableBody.innerHTML = `
             <tr>
-                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 3rem 0;">
+                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 3rem 0;">
                     No entities match the active filters.
                 </td>
             </tr>
@@ -207,15 +218,28 @@ function renderTable() {
     });
     
     floorNames.forEach(floor => {
+        const floorKey = `floor:${floor}`;
+        const isFloorCollapsed = collapsedGroups.has(floorKey);
+        
         // Render Floor Header row
         const floorTr = document.createElement('tr');
         floorTr.className = 'floor-header-row';
+        floorTr.style.cursor = 'pointer';
+        floorTr.setAttribute('onclick', `toggleGroup('${floorKey}', event)`);
+        
+        const floorChevron = isFloorCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
+        
         floorTr.innerHTML = `
-            <td colspan="5" class="floor-header-cell">
+            <td colspan="4" class="floor-header-cell">
+                <i class="fa-solid ${floorChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
                 <i class="fa-solid fa-layer-group"></i> Floor: ${floor}
             </td>
         `;
         entityTableBody.appendChild(floorTr);
+        
+        if (isFloorCollapsed) {
+            return;
+        }
         
         const roomsInFloor = groups[floor];
         // Sort room names (put "No Room" or "TBA" at the end)
@@ -226,15 +250,28 @@ function renderTable() {
         });
         
         roomNames.forEach(room => {
+            const roomKey = `room:${floor}:${room}`;
+            const isRoomCollapsed = collapsedGroups.has(roomKey);
+            
             // Render Room Header row
             const roomTr = document.createElement('tr');
             roomTr.className = 'room-header-row';
+            roomTr.style.cursor = 'pointer';
+            roomTr.setAttribute('onclick', `toggleGroup('${roomKey}', event)`);
+            
+            const roomChevron = isRoomCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
+            
             roomTr.innerHTML = `
-                <td colspan="5" class="room-header-cell">
+                <td colspan="4" class="room-header-cell">
+                    <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
                     <i class="fa-solid fa-door-open"></i> ${room}
                 </td>
             `;
             entityTableBody.appendChild(roomTr);
+            
+            if (isRoomCollapsed) {
+                return;
+            }
             
             const ents = roomsInFloor[room];
             // Sort entities within the room by ID
@@ -263,8 +300,10 @@ function renderTable() {
                 }
                 
                 tr.innerHTML = `
-                    <td class="entity-id-cell">${e.entity_id}</td>
-                    <td><strong>${e.display_name}</strong></td>
+                    <td class="entity-info-cell">
+                        <div class="entity-name"><strong>${e.display_name}</strong></div>
+                        <div class="entity-id-subtext">${e.entity_id}</div>
+                    </td>
                     <td class="inline-aliases-cell">
                         <div class="aliases-wrapper">
                             <div class="aliases-badges-list">${aliasBadges || '<span class="no-aliases">None</span>'}</div>
