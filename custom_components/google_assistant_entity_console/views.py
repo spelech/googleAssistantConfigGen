@@ -37,27 +37,30 @@ yaml.SafeDumper.add_representer(Secret, secret_representer)
 yaml.SafeDumper.add_representer(Include, include_representer)
 
 
-def get_current_yaml_filename(hass: HomeAssistant):
+def _read_file_content(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+async def get_current_yaml_filename(hass: HomeAssistant):
     config_path = hass.config.path("configuration.yaml")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config_content = f.read()
-            include_pattern = r"google_assistant:\s*!include\s*(gaGen_\d{6}\.yaml)"
-            match = re.search(include_pattern, config_content)
-            if match:
-                return match.group(1)
-        except Exception as err:
-            _LOGGER.error("Failed to read configuration.yaml: %s", err)
+    try:
+        config_content = await hass.async_add_executor_job(_read_file_content, config_path)
+        include_pattern = r"google_assistant:\s*!include\s*(gaGen_\d{6}\.yaml)"
+        match = re.search(include_pattern, config_content)
+        if match:
+            return match.group(1)
+    except FileNotFoundError:
+        pass
+    except Exception as err:
+        _LOGGER.error("Failed to read configuration.yaml: %s", err)
     return None
 
 
-def load_yaml_exposed_entities(hass: HomeAssistant, filename: str):
+async def load_yaml_exposed_entities(hass: HomeAssistant, filename: str):
     if not filename:
         return {}
     filepath = hass.config.path(filename)
-    if not os.path.exists(filepath):
-        return {}
     
     try:
         class CustomLoader(yaml.SafeLoader):
@@ -65,8 +68,7 @@ def load_yaml_exposed_entities(hass: HomeAssistant, filename: str):
         CustomLoader.add_constructor('!secret', lambda loader, node: node.value)
         CustomLoader.add_constructor('!include', lambda loader, node: node.value)
         
-        with open(filepath, "r", encoding="utf-8") as f:
-            content = f.read()
+        content = await hass.async_add_executor_job(_read_file_content, filepath)
         
         data = yaml.load(content, Loader=CustomLoader)
         if data and isinstance(data, dict):
@@ -80,6 +82,8 @@ def load_yaml_exposed_entities(hass: HomeAssistant, filename: str):
                         "room": cfg.get("room")
                     }
             return exposed
+    except FileNotFoundError:
+        pass
     except Exception as err:
         _LOGGER.error("Failed to load/parse yaml file %s: %s", filename, err)
     return {}
@@ -102,8 +106,8 @@ async def async_fetch_entities_data(hass: HomeAssistant):
     floor_map = {floor.floor_id: floor.name for floor in floor_reg.async_list_floors()}
 
     # Load currently exposed YAML config to compare
-    yaml_filename = get_current_yaml_filename(hass)
-    yaml_exposed = load_yaml_exposed_entities(hass, yaml_filename)
+    yaml_filename = await get_current_yaml_filename(hass)
+    yaml_exposed = await load_yaml_exposed_entities(hass, yaml_filename)
 
     # Build device mappings
     device_area_map = {}
@@ -187,7 +191,7 @@ class EntitiesView(HomeAssistantView):
         hass = request.app["hass"]
         try:
             entities = await async_fetch_entities_data(hass)
-            yaml_filename = get_current_yaml_filename(hass) or "None"
+            yaml_filename = (await get_current_yaml_filename(hass)) or "None"
             return self.json({
                 "entities": entities,
                 "yaml_filename": yaml_filename
