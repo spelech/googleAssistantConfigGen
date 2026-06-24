@@ -1,4 +1,6 @@
 import logging
+import json
+import os
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.components.frontend import (
@@ -19,6 +21,17 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Google Assistant Entity Console from a config entry."""
     _LOGGER.info("Setting up Google Assistant Entity Console from config entry")
+
+    # Read version from manifest.json for cache busting
+    manifest_path = hass.config.path("custom_components/google_assistant_entity_console/manifest.json")
+    version = "1.0.0"
+    if os.path.exists(manifest_path):
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                manifest_data = json.load(f)
+                version = manifest_data.get("version", "1.0.0")
+        except Exception as err:
+            _LOGGER.error("Failed to read version from manifest.json: %s", err)
 
     # 1. Register static files directory
     static_dir = hass.config.path("custom_components/google_assistant_entity_console/static")
@@ -48,8 +61,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         config={
             "_panel_custom": {
                 "name": "google-assistant-entity-console-panel",
-                "js_url": "/google_assistant_entity_console/static/panel.js",
-            }
+                "js_url": f"/google_assistant_entity_console/static/panel.js?v={version}",
+            },
+            "version": version,
         },
     )
 

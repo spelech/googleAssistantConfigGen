@@ -4,9 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google Assistant Entity Console</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const ver = urlParams.get('v') || Date.now();
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = `style.css?v=${ver}`;
+        document.head.appendChild(link);
+    </script>
 </head>
 <body>
     <div class="app-container">
@@ -46,17 +53,23 @@
             <div class="stat-card">
                 <div class="stat-icon info"><i class="fa-solid fa-file-code"></i></div>
                 <div class="stat-content">
-                    <span class="stat-label">Config File</span>
-                    <h2 id="configFile" style="font-size: 1.1rem; line-height: 1.8;">gaGen_112225.yaml</h2>
+                    <span class="stat-label">Active YAML Config</span>
+                    <h2 id="configFile" style="font-size: 1.1rem; line-height: 1.8;">Loading...</h2>
                 </div>
             </div>
         </section>
+
+        <!-- Information Alert Bar -->
+        <div class="info-alert-bar">
+            <i class="fa-solid fa-circle-info"></i>
+            <span>The <strong>Exposed Status</strong> is determined by the active Google Assistant YAML configuration file. Toggling exposure updates the Home Assistant registry and marks the entity as <strong>Pending Add</strong> or <strong>Pending Remove</strong> until you click <strong>Sync & Rebuild</strong>.</span>
+        </div>
 
         <!-- Filter & Search Controls -->
         <section class="controls-container">
             <div class="search-box">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="searchInput" placeholder="Search by name, ID or alias...">
+                <input type="text" id="searchInput" placeholder="Search by name, ID or nickname...">
             </div>
             <div class="filters">
                 <select id="domainFilter" class="filter-select">
@@ -87,17 +100,16 @@
             <table id="entityTable">
                 <thead>
                     <tr>
-                        <th width="30%">Entity ID</th>
+                        <th width="35%">Entity ID</th>
                         <th width="25%">Friendly Name</th>
-                        <th width="15%">Room / Area</th>
-                        <th width="20%">Aliases</th>
-                        <th width="10%" style="text-align: center;">Exposed</th>
-                        <th width="10%" style="text-align: center;">Actions</th>
+                        <th width="25%">Nicknames / Aliases</th>
+                        <th width="10%" style="text-align: center;">Exposed Status</th>
+                        <th width="5%" style="text-align: center;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="entityTableBody">
                     <tr>
-                        <td colspan="6" class="loading-state">
+                        <td colspan="5" class="loading-state">
                             <div class="spinner"></div>
                             <span>Loading Home Assistant registry...</span>
                         </td>
@@ -126,10 +138,10 @@
                     <small>Override name sent to Google Home. Leave blank to use default.</small>
                 </div>
                 <div class="form-group">
-                    <label>Aliases</label>
+                    <label>Nicknames / Aliases</label>
                     <div id="aliasBadgesContainer" class="alias-badges-container"></div>
                     <div class="alias-input-wrapper">
-                        <input type="text" id="modalAliasInput" placeholder="Add an alias..." class="form-input">
+                        <input type="text" id="modalAliasInput" placeholder="Add a nickname..." class="form-input">
                         <button type="button" id="addAliasBtn" class="btn btn-secondary">Add</button>
                     </div>
                     <small>Alt names Google Assistant will recognize (e.g. "Overhead Light").</small>
@@ -154,6 +166,10 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
 
-    <script src="app.js"></script>
+    <script>
+        const appScript = document.createElement('script');
+        appScript.src = `app.js?v=${ver}`;
+        document.body.appendChild(appScript);
+    </script>
 </body>
 </html>

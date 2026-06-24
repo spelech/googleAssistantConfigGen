@@ -1,4 +1,8 @@
 class GoogleAssistantEntityConsolePanel extends HTMLElement {
+  setConfig(config) {
+    this._config = config;
+  }
+
   set hass(hass) {
     if (!this._iframe) {
       this._iframe = document.createElement('iframe');
@@ -11,7 +15,8 @@ class GoogleAssistantEntityConsolePanel extends HTMLElement {
     // Update the src only once
     if (!this._iframe.src) {
       const token = hass.auth.accessToken;
-      this._iframe.src = `/google_assistant_entity_console/static/index.html?token=${encodeURIComponent(token)}`;
+      const ver = (this._config && this._config.version) || Date.now();
+      this._iframe.src = `/google_assistant_entity_console/static/index.html?token=${encodeURIComponent(token)}&v=${ver}`;
     }
   }
 }

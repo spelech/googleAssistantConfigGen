@@ -10,6 +10,7 @@ from homeassistant.helpers import (
     area_registry,
     device_registry,
     entity_registry,
+    floor_registry,
 )
 from homeassistant.util import dt as dt_util
 
@@ -36,13 +37,73 @@ yaml.SafeDumper.add_representer(Secret, secret_representer)
 yaml.SafeDumper.add_representer(Include, include_representer)
 
 
+def get_current_yaml_filename(hass: HomeAssistant):
+    config_path = hass.config.path("configuration.yaml")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config_content = f.read()
+            include_pattern = r"google_assistant:\s*!include\s*(gaGen_\d{6}\.yaml)"
+            match = re.search(include_pattern, config_content)
+            if match:
+                return match.group(1)
+        except Exception as err:
+            _LOGGER.error("Failed to read configuration.yaml: %s", err)
+    return None
+
+
+def load_yaml_exposed_entities(hass: HomeAssistant, filename: str):
+    if not filename:
+        return {}
+    filepath = hass.config.path(filename)
+    if not os.path.exists(filepath):
+        return {}
+    
+    try:
+        class CustomLoader(yaml.SafeLoader):
+            pass
+        CustomLoader.add_constructor('!secret', lambda loader, node: node.value)
+        CustomLoader.add_constructor('!include', lambda loader, node: node.value)
+        
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        data = yaml.load(content, Loader=CustomLoader)
+        if data and isinstance(data, dict):
+            entity_config = data.get("entity_config", {})
+            exposed = {}
+            for ent_id, cfg in entity_config.items():
+                if isinstance(cfg, dict) and cfg.get("expose", False):
+                    exposed[ent_id] = {
+                        "name": cfg.get("name"),
+                        "aliases": cfg.get("aliases", []),
+                        "room": cfg.get("room")
+                    }
+            return exposed
+    except Exception as err:
+        _LOGGER.error("Failed to load/parse yaml file %s: %s", filename, err)
+    return {}
+
+
 async def async_fetch_entities_data(hass: HomeAssistant):
     ent_reg = entity_registry.async_get(hass)
     dev_reg = device_registry.async_get(hass)
     area_reg = area_registry.async_get(hass)
+    floor_reg = floor_registry.async_get(hass)
 
-    # Build area name mapping
-    area_map = {area.id: area.name for area in area_reg.async_list_areas()}
+    # Build area name and floor mapping
+    area_map = {}
+    area_floor_map = {}
+    for area in area_reg.async_list_areas():
+        area_map[area.id] = area.name
+        area_floor_map[area.id] = area.floor_id
+
+    # Build floor name mapping
+    floor_map = {floor.floor_id: floor.name for floor in floor_reg.async_list_floors()}
+
+    # Load currently exposed YAML config to compare
+    yaml_filename = get_current_yaml_filename(hass)
+    yaml_exposed = load_yaml_exposed_entities(hass, yaml_filename)
 
     # Build device mappings
     device_area_map = {}
@@ -61,14 +122,18 @@ async def async_fetch_entities_data(hass: HomeAssistant):
         device_id = entry.device_id
         domain = entity_id.split(".")[0]
 
-        # Resolve Area
+        # Resolve Area and Floor
         area_id = entry.area_id
         if not area_id and device_id:
             area_id = device_area_map.get(device_id)
         
         area_name = "TBA"
+        floor_name = "TBA"
         if area_id:
             area_name = area_map.get(area_id, "TBA")
+            floor_id = area_floor_map.get(area_id)
+            if floor_id:
+                floor_name = floor_map.get(floor_id, "TBA")
 
         # Resolve Display Name
         display_name = entry.name
@@ -86,7 +151,13 @@ async def async_fetch_entities_data(hass: HomeAssistant):
         if entry.options and "conversation" in entry.options:
             should_expose = entry.options["conversation"].get("should_expose", False)
 
-        aliases = entry.aliases or []
+        # Compare with what is in the yaml file
+        yaml_exp = entity_id in yaml_exposed
+
+        # Clean/filter aliases
+        raw_aliases = entry.aliases or []
+        clean_aliases = [a for a in raw_aliases if a and a != "0" and a != 0]
+
         platform = entry.platform or ""
         device_class = entry.device_class or ""
 
@@ -98,9 +169,11 @@ async def async_fetch_entities_data(hass: HomeAssistant):
             "device_class": device_class,
             "platform": platform,
             "should_expose": should_expose,
+            "yaml_exposed": yaml_exp,
             "area": area_name,
+            "floor": floor_name,
             "domain": domain,
-            "aliases": list(aliases)
+            "aliases": clean_aliases
         })
 
     return active_entities
@@ -114,7 +187,11 @@ class EntitiesView(HomeAssistantView):
         hass = request.app["hass"]
         try:
             entities = await async_fetch_entities_data(hass)
-            return self.json(entities)
+            yaml_filename = get_current_yaml_filename(hass) or "None"
+            return self.json({
+                "entities": entities,
+                "yaml_filename": yaml_filename
+            })
         except Exception as err:
             _LOGGER.exception("Failed to fetch entities registry")
             return self.json({"error": str(err)}, status=500)
@@ -141,11 +218,16 @@ class UpdateEntityView(HomeAssistantView):
             if not entry:
                 return self.json({"error": f"Entity {entity_id} not found"}, status=404)
 
+            # Filter out any "0", 0, or empty values from aliases
+            clean_aliases = None
+            if aliases is not None:
+                clean_aliases = [a for a in aliases if a and a != "0" and a != 0]
+
             # Update entry details
             ent_reg.async_update_entity(
                 entity_id,
                 name=name if name else None,
-                aliases=set(aliases) if aliases is not None else None
+                aliases=set(clean_aliases) if clean_aliases is not None else None
             )
 
             # Update conversation (exposure) option namespace
@@ -175,10 +257,10 @@ class SyncView(HomeAssistantView):
 
             active_entities = await async_fetch_entities_data(hass)
 
-            # Sort entities by area, domain, entity_id
+            # Sort entities by floor, area, domain, entity_id
             sorted_entities = sorted(
                 active_entities,
-                key=lambda x: (x["area"] or "TBA", x["domain"], x["entity_id"])
+                key=lambda x: (x["floor"] or "TBA", x["area"] or "TBA", x["domain"], x["entity_id"])
             )
 
             entity_config = {}

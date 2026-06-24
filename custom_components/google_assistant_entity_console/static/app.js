@@ -57,7 +57,15 @@ async function fetchEntities() {
             headers: getAuthHeaders()
         });
         if (!response.ok) throw new Error('Failed to fetch entities');
-        entities = await response.json();
+        
+        const data = await response.json();
+        entities = data.entities || [];
+        
+        // Update Active YAML Config display name
+        const configFileEl = document.getElementById('configFile');
+        if (configFileEl) {
+            configFileEl.textContent = data.yaml_filename || 'None (Not Configured)';
+        }
         
         // Extract unique rooms/areas
         const uniqueRooms = [...new Set(entities.map(e => e.area))].filter(r => r && r !== "TBA").sort();
@@ -67,7 +75,7 @@ async function fetchEntities() {
         applyFilters();
     } catch (error) {
         showToast('Error loading entities: ' + error.message, 'error');
-        entityTableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger); padding: 3rem 0;">
+        entityTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 3rem 0;">
             <i class="fa-solid fa-triangle-exclamation" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>
             Error loading entity registry. Ensure Home Assistant integration is active.
         </td></tr>`;
@@ -121,7 +129,7 @@ function populateRoomFilter(uniqueRooms) {
 function showTableLoading() {
     entityTableBody.innerHTML = `
         <tr>
-            <td colspan="6" class="loading-state">
+            <td colspan="5" class="loading-state">
                 <div class="spinner"></div>
                 <span>Loading entity registry...</span>
             </td>
@@ -149,8 +157,8 @@ function applyFilters() {
         // Room match
         const matchesRoom = room === 'all' || e.area.toLowerCase() === room;
         
-        // Exposed match
-        const matchesExposed = !exposedOnly || e.should_expose;
+        // Exposed match (either marked in registry or currently exposed in YAML)
+        const matchesExposed = !exposedOnly || e.should_expose || e.yaml_exposed;
         
         return matchesQuery && matchesDomain && matchesRoom && matchesExposed;
     });
@@ -162,7 +170,7 @@ function renderTable() {
     if (filteredEntities.length === 0) {
         entityTableBody.innerHTML = `
             <tr>
-                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 3rem 0;">
+                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 3rem 0;">
                     No entities match the active filters.
                 </td>
             </tr>
@@ -171,32 +179,213 @@ function renderTable() {
     }
     
     entityTableBody.innerHTML = '';
+    
+    // Group entities by floor, then by room
+    const groups = {};
     filteredEntities.forEach(e => {
-        const tr = document.createElement('tr');
-        
-        // Aliases rendering
-        const aliasBadges = e.aliases.map(a => `<span class="badge alias-badge">${a}</span>`).join(' ') || '<span style="color: var(--text-muted); font-size: 0.85rem; font-style: italic;">None</span>';
-        
-        // Expose badge
-        const exposeBadge = e.should_expose ? 
-            `<span class="badge badge-exposed"><i class="fa-solid fa-circle-check" style="margin-right: 0.3rem;"></i>Yes</span>` : 
-            `<span class="badge badge-not-exposed">No</span>`;
-            
-        tr.innerHTML = `
-            <td class="entity-id-cell">${e.entity_id}</td>
-            <td><strong>${e.display_name}</strong></td>
-            <td class="room-cell">${e.area}</td>
-            <td><div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">${aliasBadges}</div></td>
-            <td style="text-align: center;">${exposeBadge}</td>
-            <td class="action-cell">
-                <button class="action-btn" onclick="openEditModal('${e.entity_id}')" title="Edit Google Assistant Settings">
-                    <i class="fa-solid fa-pen-to-square"></i>
-                </button>
+        const floor = e.floor || 'No Floor';
+        const room = e.area || 'No Room';
+        if (!groups[floor]) {
+            groups[floor] = {};
+        }
+        if (!groups[floor][room]) {
+            groups[floor][room] = [];
+        }
+        groups[floor][room].push(e);
+    });
+    
+    // Sort floor names (put "No Floor" or "TBA" at the end)
+    const floorNames = Object.keys(groups).sort((a, b) => {
+        if (a === 'No Floor' || a === 'TBA') return 1;
+        if (b === 'No Floor' || b === 'TBA') return -1;
+        return a.localeCompare(b);
+    });
+    
+    floorNames.forEach(floor => {
+        // Render Floor Header row
+        const floorTr = document.createElement('tr');
+        floorTr.className = 'floor-header-row';
+        floorTr.innerHTML = `
+            <td colspan="5" class="floor-header-cell">
+                <i class="fa-solid fa-layer-group"></i> Floor: ${floor}
             </td>
         `;
-        entityTableBody.appendChild(tr);
+        entityTableBody.appendChild(floorTr);
+        
+        const roomsInFloor = groups[floor];
+        // Sort room names (put "No Room" or "TBA" at the end)
+        const roomNames = Object.keys(roomsInFloor).sort((a, b) => {
+            if (a === 'No Room' || a === 'TBA') return 1;
+            if (b === 'No Room' || b === 'TBA') return -1;
+            return a.localeCompare(b);
+        });
+        
+        roomNames.forEach(room => {
+            // Render Room Header row
+            const roomTr = document.createElement('tr');
+            roomTr.className = 'room-header-row';
+            roomTr.innerHTML = `
+                <td colspan="5" class="room-header-cell">
+                    <i class="fa-solid fa-door-open"></i> ${room}
+                </td>
+            `;
+            entityTableBody.appendChild(roomTr);
+            
+            const ents = roomsInFloor[room];
+            // Sort entities within the room by ID
+            ents.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+            
+            ents.forEach(e => {
+                const tr = document.createElement('tr');
+                tr.className = 'entity-row';
+                
+                // Filter out invalid/empty/0 nicknames
+                const validAliases = (e.aliases || []).filter(a => a && a !== '0' && a !== 0);
+                
+                // Aliases rendering with inline "Add" button
+                const aliasBadges = validAliases.map(a => `<span class="badge alias-badge">${a}</span>`).join(' ');
+                
+                // Expose status badge
+                let exposeBadge = '';
+                if (e.yaml_exposed && e.should_expose) {
+                    exposeBadge = `<span class="badge badge-exposed"><i class="fa-solid fa-circle-check" style="margin-right: 0.3rem;"></i>Exposed</span>`;
+                } else if (e.should_expose && !e.yaml_exposed) {
+                    exposeBadge = `<span class="badge badge-pending-expose"><i class="fa-solid fa-circle-pause" style="margin-right: 0.3rem;"></i>Pending Add</span>`;
+                } else if (!e.should_expose && e.yaml_exposed) {
+                    exposeBadge = `<span class="badge badge-pending-remove"><i class="fa-solid fa-circle-minus" style="margin-right: 0.3rem;"></i>Pending Remove</span>`;
+                } else {
+                    exposeBadge = `<span class="badge badge-not-exposed">No</span>`;
+                }
+                
+                tr.innerHTML = `
+                    <td class="entity-id-cell">${e.entity_id}</td>
+                    <td><strong>${e.display_name}</strong></td>
+                    <td class="inline-aliases-cell">
+                        <div class="aliases-wrapper">
+                            <div class="aliases-badges-list">${aliasBadges || '<span class="no-aliases">None</span>'}</div>
+                            <button class="inline-add-alias-btn" onclick="openQuickAliasModal('${e.entity_id}', event)" title="Add nickname">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td style="text-align: center;">${exposeBadge}</td>
+                    <td class="action-cell">
+                        <button class="action-btn" onclick="openEditModal('${e.entity_id}')" title="Edit Google Assistant Settings">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                    </td>
+                `;
+                entityTableBody.appendChild(tr);
+            });
+        });
     });
 }
+
+// Inline Quick Nickname Input Handler
+window.openQuickAliasModal = function(entityId, event) {
+    event.stopPropagation();
+    const btn = event.currentTarget;
+    const wrapper = btn.closest('.aliases-wrapper');
+    if (!wrapper) return;
+    
+    // Hide list and button
+    const list = wrapper.querySelector('.aliases-badges-list');
+    btn.style.display = 'none';
+    if (list) list.style.display = 'none';
+    
+    // Create inline input
+    const container = document.createElement('div');
+    container.className = 'inline-alias-input-container';
+    container.innerHTML = `
+        <input type="text" class="inline-alias-input" placeholder="Nickname..." autofocus>
+        <button class="inline-alias-submit-btn" title="Save"><i class="fa-solid fa-check"></i></button>
+        <button class="inline-alias-cancel-btn" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+    `;
+    
+    wrapper.appendChild(container);
+    
+    const input = container.querySelector('.inline-alias-input');
+    const submitBtn = container.querySelector('.inline-alias-submit-btn');
+    const cancelBtn = container.querySelector('.inline-alias-cancel-btn');
+    
+    input.focus();
+    
+    const cleanup = () => {
+        container.remove();
+        btn.style.display = '';
+        if (list) list.style.display = '';
+    };
+    
+    cancelBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cleanup();
+    });
+    
+    const submit = async () => {
+        const val = input.value.trim();
+        if (!val || val === '0') {
+            cleanup();
+            return;
+        }
+        
+        const entity = entities.find(e => e.entity_id === entityId);
+        if (!entity) {
+            cleanup();
+            return;
+        }
+        
+        if (entity.aliases.includes(val)) {
+            showToast('Nickname already exists', 'error');
+            cleanup();
+            return;
+        }
+        
+        const updatedAliases = [...entity.aliases, val];
+        
+        try {
+            const response = await fetch('/api/google_assistant_entity_console/entities/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders()
+                },
+                body: JSON.stringify({
+                    entity_id: entityId,
+                    name: entity.name,
+                    aliases: updatedAliases,
+                    should_expose: entity.should_expose
+                })
+            });
+            
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to add nickname');
+            }
+            
+            entity.aliases = updatedAliases;
+            showToast('Nickname added successfully', 'success');
+            applyFilters();
+        } catch (error) {
+            showToast('Error adding nickname: ' + error.message, 'error');
+            cleanup();
+        }
+    };
+    
+    submitBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        submit();
+    });
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submit();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cleanup();
+        }
+    });
+};
 
 // Open Edit Modal
 window.openEditModal = function(entityId) {
@@ -207,7 +396,9 @@ window.openEditModal = function(entityId) {
     modalEntityIdDisplay.value = entity.entity_id;
     modalFriendlyName.value = entity.name || '';
     modalExposedCheckbox.checked = entity.should_expose;
-    currentAliases = [...entity.aliases];
+    
+    // Filter out invalid aliases
+    currentAliases = [...(entity.aliases || [])].filter(a => a && a !== '0' && a !== 0);
     
     renderAliasBadges();
     
@@ -222,7 +413,7 @@ function closeModal() {
 function renderAliasBadges() {
     aliasBadgesContainer.innerHTML = '';
     if (currentAliases.length === 0) {
-        aliasBadgesContainer.innerHTML = '<span style="font-size: 0.9rem; color: var(--text-muted); font-style: italic;">No aliases added.</span>';
+        aliasBadgesContainer.innerHTML = '<span style="font-size: 0.9rem; color: var(--text-muted); font-style: italic;">No nicknames added.</span>';
         return;
     }
     
@@ -244,7 +435,7 @@ window.removeAlias = function(index) {
 
 function addAliasFromInput() {
     const aliasText = modalAliasInput.value.trim();
-    if (aliasText && !currentAliases.includes(aliasText)) {
+    if (aliasText && aliasText !== '0' && !currentAliases.includes(aliasText)) {
         currentAliases.push(aliasText);
         renderAliasBadges();
         modalAliasInput.value = '';
@@ -322,6 +513,8 @@ async function handleSync() {
         
         const result = await response.json();
         showToast(`Configuration generated. Sync sent. (${result.exposed_count} entities exposed)`, 'success');
+        // Refresh entities state from backend to update yaml_exposed values
+        await fetchEntities();
     } catch (error) {
         showToast('Error syncing configs: ' + error.message, 'error');
     } finally {
