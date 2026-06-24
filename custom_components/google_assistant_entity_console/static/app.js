@@ -44,10 +44,15 @@ function getAuthHeaders() {
 }
 
 // Init
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchEntities();
+        setupEventListeners();
+    });
+} else {
     fetchEntities();
     setupEventListeners();
-});
+}
 
 // Fetch all entities from backend
 async function fetchEntities() {
