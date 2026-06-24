@@ -59,12 +59,12 @@ async function fetchEntities() {
         if (!response.ok) throw new Error('Failed to fetch entities');
         
         const data = await response.json();
-        entities = data.entities || [];
+        entities = Array.isArray(data) ? data : (data.entities || []);
         
         // Update Active YAML Config display name
         const configFileEl = document.getElementById('configFile');
         if (configFileEl) {
-            configFileEl.textContent = data.yaml_filename || 'None (Not Configured)';
+            configFileEl.textContent = Array.isArray(data) ? 'gaGen_112225.yaml' : (data.yaml_filename || 'None (Not Configured)');
         }
         
         // Extract unique rooms/areas
