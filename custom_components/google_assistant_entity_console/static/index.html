@@ -7,12 +7,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const ver = urlParams.get('v') || Date.now();
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = `style.css?v=${ver}`;
-        document.head.appendChild(link);
+        {
+            const urlParams = new URLSearchParams(window.location.search);
+            const ver = urlParams.get('v') || Date.now();
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = `style.css?v=${ver}`;
+            document.head.appendChild(link);
+        }
     </script>
 </head>
 <body>
@@ -167,11 +169,13 @@
     <div id="toast" class="toast"></div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const ver = urlParams.get('v') || Date.now();
-        const appScript = document.createElement('script');
-        appScript.src = `app.js?v=${ver}`;
-        document.body.appendChild(appScript);
+        {
+            const urlParams = new URLSearchParams(window.location.search);
+            const ver = urlParams.get('v') || Date.now();
+            const appScript = document.createElement('script');
+            appScript.src = `app.js?v=${ver}`;
+            document.body.appendChild(appScript);
+        }
     </script>
 </body>
 </html>
