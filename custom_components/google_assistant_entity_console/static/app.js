@@ -13,7 +13,7 @@ const domainFilter = document.getElementById('domainFilter');
 const roomFilter = document.getElementById('roomFilter');
 const exposedOnlyCheckbox = document.getElementById('exposedOnlyCheckbox');
 const entityTableBody = document.getElementById('entityTableBody');
-const syncBtn = document.getElementById('syncBtn');
+const rebuildBtn = document.getElementById('rebuildBtn');
 
 // Modal Elements
 const editModal = document.getElementById('editModal');
@@ -25,6 +25,11 @@ const modalAliasInput = document.getElementById('modalAliasInput');
 const addAliasBtn = document.getElementById('addAliasBtn');
 const aliasBadgesContainer = document.getElementById('aliasBadgesContainer');
 const modalExposedCheckbox = document.getElementById('modalExposedCheckbox');
+
+// Restart Modal Elements
+const restartModal = document.getElementById('restartModal');
+const cancelRestartBtn = document.getElementById('cancelRestartBtn');
+const confirmRestartBtn = document.getElementById('confirmRestartBtn');
 
 // Get auth headers from URL token parameter or session storage
 function getAuthHeaders() {
@@ -95,8 +100,8 @@ function setupEventListeners() {
     roomFilter.addEventListener('change', applyFilters);
     exposedOnlyCheckbox.addEventListener('change', applyFilters);
     
-    // Sync Button
-    syncBtn.addEventListener('click', handleSync);
+    // Rebuild Button
+    rebuildBtn.addEventListener('click', handleRebuild);
     
     // Modal controls
     document.querySelectorAll('.close-modal, .close-modal-btn').forEach(el => {
@@ -114,6 +119,12 @@ function setupEventListeners() {
             addAliasFromInput();
         }
     });
+
+    // Restart Modal controls
+    cancelRestartBtn.addEventListener('click', () => {
+        restartModal.style.display = 'none';
+    });
+    confirmRestartBtn.addEventListener('click', handleRestart);
 }
 
 function updateStats() {
@@ -534,14 +545,14 @@ async function handleEditSubmit(e) {
     }
 }
 
-// Trigger YAML generation & sync reload
-async function handleSync() {
-    syncBtn.disabled = true;
-    const icon = syncBtn.querySelector('i');
+// Trigger YAML generation & rebuild
+async function handleRebuild() {
+    rebuildBtn.disabled = true;
+    const icon = rebuildBtn.querySelector('i');
     icon.className = 'fa-solid fa-spinner fa-spin';
     
     try {
-        const response = await fetch('/api/google_assistant_entity_console/sync', {
+        const response = await fetch('/api/google_assistant_entity_console/rebuild', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -552,18 +563,54 @@ async function handleSync() {
         
         if (!response.ok) {
             const err = await response.json();
-            throw new Error(err.error || 'Sync failed');
+            throw new Error(err.error || 'Rebuild failed');
         }
         
         const result = await response.json();
-        showToast(`Configuration generated. Sync sent. (${result.exposed_count} entities exposed)`, 'success');
-        // Refresh entities state from backend to update yaml_exposed values
-        await fetchEntities();
+        showToast(`Configuration generated successfully. (${result.exposed_count} entities exposed)`, 'success');
+        // Open restart confirmation modal
+        restartModal.style.display = 'block';
     } catch (error) {
-        showToast('Error syncing configs: ' + error.message, 'error');
+        showToast('Error rebuilding configs: ' + error.message, 'error');
     } finally {
-        syncBtn.disabled = false;
-        icon.className = 'fa-solid fa-rotate';
+        rebuildBtn.disabled = false;
+        icon.className = 'fa-solid fa-file-code';
+    }
+}
+
+// Trigger Home Assistant restart
+async function handleRestart() {
+    confirmRestartBtn.disabled = true;
+    cancelRestartBtn.disabled = true;
+    confirmRestartBtn.textContent = 'Restarting...';
+    
+    try {
+        const response = await fetch('/api/google_assistant_entity_console/restart', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({})
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Restart failed');
+        }
+        
+        showToast('Home Assistant is restarting...', 'success');
+        restartModal.style.display = 'none';
+        
+        // Wait and check back
+        setTimeout(() => {
+            window.location.reload();
+        }, 12000);
+    } catch (error) {
+        showToast('Error restarting Home Assistant: ' + error.message, 'error');
+        confirmRestartBtn.disabled = false;
+        cancelRestartBtn.disabled = false;
+        confirmRestartBtn.textContent = 'Yes, Restart';
     }
 }
 

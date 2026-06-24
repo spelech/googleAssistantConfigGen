@@ -29,9 +29,9 @@
                 </div>
             </div>
             <div class="header-actions">
-                <button id="syncBtn" class="btn btn-primary">
-                    <i class="fa-solid fa-rotate"></i>
-                    <span>Sync & Rebuild</span>
+                <button id="rebuildBtn" class="btn btn-primary">
+                    <i class="fa-solid fa-file-code"></i>
+                    <span>Rebuild Config</span>
                 </button>
             </div>
         </header>
@@ -161,6 +161,22 @@
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Restart Confirmation Modal -->
+    <div id="restartModal" class="modal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div class="modal-header" style="border-bottom: none; justify-content: center;">
+                <h2>Restart Home Assistant?</h2>
+            </div>
+            <p style="margin: 0.5rem 0 1rem; color: var(--on-surface-variant); font-size: 0.95rem; line-height: 1.5;">
+                The new Google Assistant YAML configuration has been successfully rebuilt. Would you like to restart Home Assistant now to apply the changes?
+            </p>
+            <div class="modal-actions" style="border-top: none; justify-content: center; padding-top: 0;">
+                <button id="cancelRestartBtn" class="btn btn-secondary">No, Later</button>
+                <button id="confirmRestartBtn" class="btn btn-primary">Yes, Restart</button>
+            </div>
         </div>
     </div>
 

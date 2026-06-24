@@ -247,9 +247,9 @@ class UpdateEntityView(HomeAssistantView):
             return self.json({"error": str(err)}, status=500)
 
 
-class SyncView(HomeAssistantView):
-    url = "/api/google_assistant_entity_console/sync"
-    name = "api:google_assistant_entity_console:sync"
+class RebuildView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/rebuild"
+    name = "api:google_assistant_entity_console:rebuild"
 
     async def post(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
@@ -330,31 +330,25 @@ class SyncView(HomeAssistantView):
                 else:
                     _LOGGER.warning("Could not find google_assistant !include line in configuration.yaml")
 
-            # Reload Home Assistant core configuration
-            try:
-                await hass.services.async_call(
-                    "homeassistant",
-                    "reload_core_config",
-                    blocking=True
-                )
-            except Exception as err:
-                _LOGGER.error("Failed to reload core config: %s", err)
-
-            # Request Google Assistant sync
-            try:
-                await hass.services.async_call(
-                    "google_assistant",
-                    "request_sync",
-                    blocking=True
-                )
-            except Exception as err:
-                _LOGGER.error("Failed to request Google Assistant sync: %s", err)
-
             return self.json({
                 "success": True,
                 "exposed_count": len(entity_config),
                 "yaml_written": filepath
             })
         except Exception as err:
-            _LOGGER.exception("Failed to sync configs")
+            _LOGGER.exception("Failed to rebuild configs")
+            return self.json({"error": str(err)}, status=500)
+
+
+class RestartView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/restart"
+    name = "api:google_assistant_entity_console:restart"
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            await hass.services.async_call("homeassistant", "restart", blocking=False)
+            return self.json({"success": True})
+        except Exception as err:
+            _LOGGER.exception("Failed to trigger Home Assistant restart")
             return self.json({"error": str(err)}, status=500)
