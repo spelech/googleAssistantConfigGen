@@ -22,16 +22,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Google Assistant Entity Console from a config entry."""
     _LOGGER.info("Setting up Google Assistant Entity Console from config entry")
 
-    # Read version from manifest.json for cache busting
-    manifest_path = hass.config.path("custom_components/google_assistant_entity_console/manifest.json")
-    version = "1.0.0"
-    if os.path.exists(manifest_path):
-        try:
-            with open(manifest_path, "r", encoding="utf-8") as f:
-                manifest_data = json.load(f)
-                version = manifest_data.get("version", "1.0.0")
-        except Exception as err:
-            _LOGGER.error("Failed to read version from manifest.json: %s", err)
+    # Read version natively via Home Assistant loader for cache busting
+    from homeassistant.loader import async_get_integration
+    try:
+        integration = await async_get_integration(hass, DOMAIN)
+        version = integration.version
+    except Exception as err:
+        _LOGGER.error("Failed to read version from integration loader: %s", err)
+        version = "1.0.3"
 
     # 1. Register static files directory
     static_dir = hass.config.path("custom_components/google_assistant_entity_console/static")
