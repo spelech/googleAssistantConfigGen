@@ -15,16 +15,7 @@ const exposedOnlyCheckbox = document.getElementById('exposedOnlyCheckbox');
 const entityTableBody = document.getElementById('entityTableBody');
 const rebuildBtn = document.getElementById('rebuildBtn');
 
-// Modal Elements
-const editModal = document.getElementById('editModal');
-const editForm = document.getElementById('editForm');
-const modalEntityId = document.getElementById('modalEntityId');
-const modalEntityIdDisplay = document.getElementById('modalEntityIdDisplay');
-const modalFriendlyName = document.getElementById('modalFriendlyName');
-const modalAliasInput = document.getElementById('modalAliasInput');
-const addAliasBtn = document.getElementById('addAliasBtn');
-const aliasBadgesContainer = document.getElementById('aliasBadgesContainer');
-const modalExposedCheckbox = document.getElementById('modalExposedCheckbox');
+
 
 // Restart Modal Elements
 const restartModal = document.getElementById('restartModal');
@@ -118,22 +109,7 @@ function setupEventListeners() {
     // Rebuild Button
     rebuildBtn.addEventListener('click', handleRebuild);
     
-    // Modal controls
-    document.querySelectorAll('.close-modal, .close-modal-btn').forEach(el => {
-        el.addEventListener('click', closeModal);
-    });
-    
-    // Edit Form submit
-    editForm.addEventListener('submit', handleEditSubmit);
-    
-    // Add alias interactions
-    addAliasBtn.addEventListener('click', addAliasFromInput);
-    modalAliasInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            addAliasFromInput();
-        }
-    });
+
 
     // Restart Modal controls
     cancelRestartBtn.addEventListener('click', () => {
@@ -385,25 +361,35 @@ function renderTable() {
                     // Filter out invalid/empty/0 nicknames
                     const validAliases = (e.aliases || []).filter(a => a && a !== '0' && a !== 0);
                     
-                    // Aliases rendering with inline "Add" button
-                    const aliasBadges = validAliases.map(a => `<span class="badge alias-badge">${a}</span>`).join(' ');
+                    // Aliases rendering with direct click-to-remove and inline "Add" button
+                    const aliasBadges = validAliases.map(a => `
+                        <span class="badge alias-badge" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.5rem;">
+                            ${a}
+                            <i class="fa-solid fa-xmark" onclick="removeAliasDirectly('${e.entity_id}', '${a.replace(/'/g, "\\'")}', event)" style="cursor: pointer; font-size: 0.75rem; color: var(--on-surface-variant); transition: color 0.15s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--on-surface-variant)'" title="Remove nickname"></i>
+                        </span>
+                    `).join(' ');
                     
-                    // Expose status badge
+                    // Expose status badge (directly togglable on click)
                     let exposeBadge = '';
                     if (e.yaml_exposed && e.should_expose) {
-                        exposeBadge = `<span class="badge badge-exposed"><i class="fa-solid fa-circle-check" style="margin-right: 0.3rem;"></i>Exposed</span>`;
+                        exposeBadge = `<span class="badge badge-exposed" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure"><i class="fa-solid fa-circle-check" style="margin-right: 0.3rem;"></i>Exposed</span>`;
                     } else if (e.should_expose && !e.yaml_exposed) {
-                        exposeBadge = `<span class="badge badge-pending-expose"><i class="fa-solid fa-circle-pause" style="margin-right: 0.3rem;"></i>Pending Add</span>`;
+                        exposeBadge = `<span class="badge badge-pending-expose" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure"><i class="fa-solid fa-circle-pause" style="margin-right: 0.3rem;"></i>Pending Add</span>`;
                     } else if (!e.should_expose && e.yaml_exposed) {
-                        exposeBadge = `<span class="badge badge-pending-remove"><i class="fa-solid fa-circle-minus" style="margin-right: 0.3rem;"></i>Pending Remove</span>`;
+                        exposeBadge = `<span class="badge badge-pending-remove" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure"><i class="fa-solid fa-circle-minus" style="margin-right: 0.3rem;"></i>Pending Remove</span>`;
                     } else {
-                        exposeBadge = `<span class="badge badge-not-exposed">No</span>`;
+                        exposeBadge = `<span class="badge badge-not-exposed" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure">No</span>`;
                     }
                     
                     tr.innerHTML = `
                         <td>
                             <div class="entity-info-wrapper">
-                                <div class="entity-name"><strong>${e.display_name}</strong></div>
+                                <div class="entity-name-wrapper" style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                                    <div class="entity-name"><strong>${e.display_name}</strong></div>
+                                    <button class="inline-edit-name-btn" onclick="openEditNameInline('${e.entity_id}', event)" title="Rename Entity" style="background: none; border: none; cursor: pointer; font-size: 0.75rem; padding: 0.2rem;">
+                                        <i class="fa-solid fa-pencil"></i>
+                                    </button>
+                                </div>
                                 <div class="entity-id-subtext">${e.entity_id}</div>
                             </div>
                         </td>
@@ -416,12 +402,9 @@ function renderTable() {
                             </div>
                         </td>
                         <td style="text-align: center;">${exposeBadge}</td>
-                        <td class="action-cell" style="white-space: nowrap;">
-                            <button class="action-btn" onclick="addToBlocklistDirectly('${e.entity_id}', event)" title="Block / Permanently Hide" style="color: var(--danger); margin-right: 0.25rem;">
+                        <td class="action-cell">
+                            <button class="action-btn" onclick="addToBlocklistDirectly('${e.entity_id}', event)" title="Block / Permanently Hide" style="color: var(--danger);">
                                 <i class="fa-solid fa-eye-slash"></i>
-                            </button>
-                            <button class="action-btn" onclick="openEditModal('${e.entity_id}')" title="Edit Google Assistant Settings">
-                                <i class="fa-solid fa-pen-to-square"></i>
                             </button>
                         </td>
                     `;
@@ -539,107 +522,7 @@ window.openQuickAliasModal = function(entityId, event) {
 };
 
 // Open Edit Modal
-window.openEditModal = function(entityId) {
-    const entity = entities.find(e => e.entity_id === entityId);
-    if (!entity) return;
-    
-    modalEntityId.value = entity.entity_id;
-    modalEntityIdDisplay.value = entity.entity_id;
-    modalFriendlyName.value = entity.name || '';
-    modalExposedCheckbox.checked = entity.should_expose;
-    
-    // Filter out invalid aliases
-    currentAliases = [...(entity.aliases || [])].filter(a => a && a !== '0' && a !== 0);
-    
-    renderAliasBadges();
-    
-    editModal.style.display = 'block';
-};
 
-function closeModal() {
-    editModal.style.display = 'none';
-    modalAliasInput.value = '';
-}
-
-function renderAliasBadges() {
-    aliasBadgesContainer.innerHTML = '';
-    if (currentAliases.length === 0) {
-        aliasBadgesContainer.innerHTML = '<span style="font-size: 0.9rem; color: var(--text-muted); font-style: italic;">No nicknames added.</span>';
-        return;
-    }
-    
-    currentAliases.forEach((alias, index) => {
-        const badge = document.createElement('span');
-        badge.className = 'alias-badge-edit';
-        badge.innerHTML = `
-            <span>${alias}</span>
-            <i class="fa-solid fa-circle-xmark" onclick="removeAlias(${index})"></i>
-        `;
-        aliasBadgesContainer.appendChild(badge);
-    });
-}
-
-window.removeAlias = function(index) {
-    currentAliases.splice(index, 1);
-    renderAliasBadges();
-};
-
-function addAliasFromInput() {
-    const aliasText = modalAliasInput.value.trim();
-    if (aliasText && aliasText !== '0' && !currentAliases.includes(aliasText)) {
-        currentAliases.push(aliasText);
-        renderAliasBadges();
-        modalAliasInput.value = '';
-    }
-}
-
-// Submit Edit
-async function handleEditSubmit(e) {
-    e.preventDefault();
-    
-    const entityId = modalEntityId.value;
-    const name = modalFriendlyName.value.trim();
-    const should_expose = modalExposedCheckbox.checked;
-    
-    const updatePayload = {
-        entity_id: entityId,
-        name: name || null,
-        aliases: currentAliases,
-        should_expose: should_expose
-    };
-    
-    try {
-        const response = await fetch('/api/google_assistant_entity_console/entities/update', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders()
-            },
-            body: JSON.stringify(updatePayload)
-        });
-        
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.error || 'Failed to update entity');
-        }
-        
-        // Update local state
-        const entityIdx = entities.findIndex(ent => ent.entity_id === entityId);
-        if (entityIdx !== -1) {
-            entities[entityIdx].name = name || null;
-            entities[entityIdx].display_name = name || entities[entityIdx].original_name || entityId.split('.').pop()?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '';
-            entities[entityIdx].aliases = [...currentAliases];
-            entities[entityIdx].should_expose = should_expose;
-        }
-        
-        showToast('Settings saved successfully', 'success');
-        closeModal();
-        updateStats();
-        applyFilters();
-    } catch (error) {
-        showToast('Error saving entity: ' + error.message, 'error');
-    }
-}
 
 // Trigger YAML generation & rebuild
 async function handleRebuild() {
@@ -709,6 +592,169 @@ async function handleRestart() {
         confirmRestartBtn.textContent = 'Yes, Restart';
     }
 }
+
+// Click to toggle exposure status directly
+window.toggleExposeDirectly = async function(entityId, event) {
+    if (event) event.stopPropagation();
+    const entity = entities.find(e => e.entity_id === entityId);
+    if (!entity) return;
+    
+    const newExposeStatus = !entity.should_expose;
+    
+    try {
+        const response = await fetch('/api/google_assistant_entity_console/entities/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+                entity_id: entityId,
+                should_expose: newExposeStatus
+            })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to toggle status');
+        }
+        
+        entity.should_expose = newExposeStatus;
+        showToast(`Exposure updated for ${entity.display_name}`, 'success');
+        updateStats();
+        applyFilters();
+    } catch (error) {
+        showToast('Error toggling exposure: ' + error.message, 'error');
+    }
+};
+
+// Remove nickname badge directly from table row
+window.removeAliasDirectly = async function(entityId, alias, event) {
+    if (event) event.stopPropagation();
+    const entity = entities.find(e => e.entity_id === entityId);
+    if (!entity) return;
+    
+    const updatedAliases = (entity.aliases || []).filter(a => a !== alias);
+    
+    try {
+        const response = await fetch('/api/google_assistant_entity_console/entities/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+                entity_id: entityId,
+                aliases: updatedAliases
+            })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to remove nickname');
+        }
+        
+        entity.aliases = updatedAliases;
+        showToast(`Removed nickname "${alias}"`, 'success');
+        applyFilters();
+    } catch (error) {
+        showToast('Error removing nickname: ' + error.message, 'error');
+    }
+};
+
+// Inline friendly name editing
+window.openEditNameInline = function(entityId, event) {
+    if (event) event.stopPropagation();
+    const cell = event.currentTarget.closest('.entity-info-wrapper');
+    if (!cell) return;
+    
+    const nameWrapper = cell.querySelector('.entity-name-wrapper');
+    let inputContainer = cell.querySelector('.inline-name-input-container');
+    
+    if (!inputContainer) {
+        const entity = entities.find(e => e.entity_id === entityId);
+        if (!entity) return;
+        
+        inputContainer = document.createElement('div');
+        inputContainer.className = 'inline-name-input-container';
+        inputContainer.style.display = 'flex';
+        inputContainer.style.alignItems = 'center';
+        inputContainer.style.gap = '0.25rem';
+        inputContainer.innerHTML = `
+            <input type="text" class="inline-name-input" value="${entity.display_name}" style="background-color: var(--surface-variant); border: 1px solid var(--border); color: var(--on-surface); font-size: 0.9rem; padding: 0.15rem 0.4rem; border-radius: 6px; width: 160px;" autofocus>
+            <button class="inline-name-submit-btn" title="Save" style="color: var(--success); background: none; border: none; cursor: pointer; padding: 0.2rem;"><i class="fa-solid fa-check"></i></button>
+            <button class="inline-name-cancel-btn" title="Cancel" style="color: var(--danger); background: none; border: none; cursor: pointer; padding: 0.2rem;"><i class="fa-solid fa-xmark"></i></button>
+        `;
+        cell.insertBefore(inputContainer, nameWrapper);
+        
+        const input = inputContainer.querySelector('.inline-name-input');
+        const submitBtn = inputContainer.querySelector('.inline-name-submit-btn');
+        const cancelBtn = inputContainer.querySelector('.inline-name-cancel-btn');
+        
+        input.focus();
+        
+        cancelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            inputContainer.remove();
+            nameWrapper.style.display = 'inline-flex';
+        });
+        
+        const submit = async () => {
+            const newName = input.value.trim();
+            if (newName === entity.display_name) {
+                inputContainer.remove();
+                nameWrapper.style.display = 'inline-flex';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/google_assistant_entity_console/entities/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({
+                        entity_id: entityId,
+                        name: newName || null
+                    })
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Failed to update name');
+                }
+                
+                entity.name = newName || null;
+                entity.display_name = newName || entity.original_name || entityId.split('.').pop()?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || '';
+                showToast('Name updated successfully', 'success');
+                applyFilters();
+            } catch (error) {
+                showToast('Error updating name: ' + error.message, 'error');
+                inputContainer.remove();
+                nameWrapper.style.display = 'inline-flex';
+            }
+        };
+        
+        submitBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            submit();
+        });
+        
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submit();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                inputContainer.remove();
+                nameWrapper.style.display = 'inline-flex';
+            }
+        });
+    }
+    
+    nameWrapper.style.display = 'none';
+};
 
 // Toast notification helper
 function showToast(message, type = 'success') {

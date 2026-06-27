@@ -365,6 +365,12 @@ tr:hover td {
     font-size: 0.8rem;
     font-weight: 500;
     letter-spacing: 0.25px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.badge:hover {
+    opacity: 0.85;
 }
 
 .badge-exposed {
@@ -401,6 +407,16 @@ tr:hover td {
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--on-surface);
+}
+
+.inline-edit-name-btn {
+    opacity: 0.2;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.entity-name-wrapper:hover .inline-edit-name-btn {
+    opacity: 1;
+    color: var(--primary) !important;
 }
 
 .entity-id-subtext {

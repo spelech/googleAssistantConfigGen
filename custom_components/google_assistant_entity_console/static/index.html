@@ -124,49 +124,7 @@
         </main>
     </div>
 
-    <!-- Edit Modal -->
-    <div id="editModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Edit Google Assistant Settings</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <form id="editForm">
-                <input type="hidden" id="modalEntityId">
-                <div class="form-group">
-                    <label>Entity ID</label>
-                    <input type="text" id="modalEntityIdDisplay" disabled class="form-input">
-                </div>
-                <div class="form-group">
-                    <label for="modalFriendlyName">Friendly Name Override</label>
-                    <input type="text" id="modalFriendlyName" placeholder="Default name" class="form-input">
-                    <small>Override name sent to Google Home. Leave blank to use default.</small>
-                </div>
-                <div class="form-group">
-                    <label>Nicknames / Aliases</label>
-                    <div id="aliasBadgesContainer" class="alias-badges-container"></div>
-                    <div class="alias-input-wrapper">
-                        <input type="text" id="modalAliasInput" placeholder="Add a nickname..." class="form-input">
-                        <button type="button" id="addAliasBtn" class="btn btn-secondary">Add</button>
-                    </div>
-                    <small>Alt names Google Assistant will recognize (e.g. "Overhead Light").</small>
-                </div>
-                <div class="form-group toggle-group">
-                    <div class="toggle-container">
-                        <label class="switch-toggle">
-                            <input type="checkbox" id="modalExposedCheckbox">
-                            <span class="slider"></span>
-                        </label>
-                        <span class="toggle-label font-medium">Expose to Google Assistant</span>
-                    </div>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary close-modal-btn">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
-                </div>
-            </form>
-        </div>
-    </div>
+
 
     <!-- Blocklist Manager Modal -->
     <div id="blocklistModal" class="modal">
