@@ -126,6 +126,28 @@ async def async_fetch_entities_data(hass: HomeAssistant):
         device_id = entry.device_id
         domain = entity_id.split(".")[0]
 
+        # Filter supported domains and specific device classes as per Google Assistant integration docs
+        device_class = entry.device_class or entry.original_device_class or ""
+        supported_domains = {
+            "alarm_control_panel", "button", "camera", "climate", "cover", "fan",
+            "group", "humidifier", "input_boolean", "input_button", "input_select",
+            "light", "lawn_mower", "lock", "media_player", "scene", "script",
+            "select", "switch", "vacuum", "valve", "water_heater"
+        }
+
+        if domain not in supported_domains:
+            if domain == "binary_sensor":
+                if device_class not in {"carbon_monoxide", "door", "garage_door", "lock", "moisture", "opening", "smoke", "window"}:
+                    continue
+            elif domain == "event":
+                if device_class != "doorbell":
+                    continue
+            elif domain == "sensor":
+                if device_class not in {"aqi", "carbon_dioxide", "carbon_monoxide", "humidity", "pm10", "pm25", "temperature", "volatile_organic_compounds"}:
+                    continue
+            else:
+                continue
+
         # Resolve Area and Floor
         area_id = entry.area_id
         if not area_id and device_id:
@@ -192,9 +214,19 @@ class EntitiesView(HomeAssistantView):
         try:
             entities = await async_fetch_entities_data(hass)
             yaml_filename = (await get_current_yaml_filename(hass)) or "None"
+            
+            # Read version natively via Home Assistant loader
+            from homeassistant.loader import async_get_integration
+            try:
+                integration = await async_get_integration(hass, DOMAIN)
+                version = integration.version
+            except Exception:
+                version = "Unknown"
+
             return self.json({
                 "entities": entities,
-                "yaml_filename": yaml_filename
+                "yaml_filename": yaml_filename,
+                "version": version
             })
         except Exception as err:
             _LOGGER.exception("Failed to fetch entities registry")

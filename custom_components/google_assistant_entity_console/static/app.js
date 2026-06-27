@@ -77,6 +77,12 @@ async function fetchEntities() {
         if (configFileEl) {
             configFileEl.textContent = Array.isArray(data) ? 'gaGen_112225.yaml' : (data.yaml_filename || 'None (Not Configured)');
         }
+
+        // Update app version label
+        const appVersionEl = document.getElementById('appVersion');
+        if (appVersionEl && data.version) {
+            appVersionEl.textContent = `Entity Console v${data.version}`;
+        }
         
         // Extract unique rooms/areas
         const uniqueRooms = [...new Set(entities.map(e => e.area))].filter(r => r && r !== "TBA").sort();
