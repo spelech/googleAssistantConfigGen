@@ -31,6 +31,15 @@ const restartModal = document.getElementById('restartModal');
 const cancelRestartBtn = document.getElementById('cancelRestartBtn');
 const confirmRestartBtn = document.getElementById('confirmRestartBtn');
 
+// Blocklist Modal Elements
+const blocklistModal = document.getElementById('blocklistModal');
+const manageBlocklistBtn = document.getElementById('manageBlocklistBtn');
+const newBlocklistPattern = document.getElementById('newBlocklistPattern');
+const addBlocklistPatternBtn = document.getElementById('addBlocklistPatternBtn');
+const blocklistContainer = document.getElementById('blocklistContainer');
+const closeBlocklistModal = document.getElementById('closeBlocklistModal');
+const closeBlocklistModalBtn = document.getElementById('closeBlocklistModalBtn');
+
 // Get auth headers from URL token parameter or session storage
 function getAuthHeaders() {
     const params = new URLSearchParams(window.location.search);
@@ -131,6 +140,29 @@ function setupEventListeners() {
         restartModal.style.display = 'none';
     });
     confirmRestartBtn.addEventListener('click', handleRestart);
+
+    // Blocklist Modal controls
+    manageBlocklistBtn.addEventListener('click', () => {
+        fetchBlocklist();
+        blocklistModal.style.display = 'block';
+    });
+    const hideBlocklist = () => {
+        blocklistModal.style.display = 'none';
+    };
+    closeBlocklistModal.addEventListener('click', hideBlocklist);
+    closeBlocklistModalBtn.addEventListener('click', hideBlocklist);
+    
+    addBlocklistPatternBtn.addEventListener('click', () => {
+        const val = newBlocklistPattern.value.trim();
+        if (val) addBlocklistPattern(val);
+    });
+    newBlocklistPattern.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = newBlocklistPattern.value.trim();
+            if (val) addBlocklistPattern(val);
+        }
+    });
 }
 
 function updateStats() {
@@ -199,6 +231,27 @@ window.toggleGroup = function(groupKey, event) {
     renderTable();
 };
 
+const domainNames = {
+    light: 'Lights',
+    switch: 'Switches',
+    media_player: 'Media Players',
+    fan: 'Fans',
+    sensor: 'Sensors',
+    binary_sensor: 'Binary Sensors',
+    cover: 'Covers',
+    climate: 'Climate Devices',
+    lock: 'Locks',
+    vacuum: 'Vacuums',
+    scene: 'Scenes',
+    script: 'Scripts',
+    camera: 'Cameras',
+    valve: 'Valves'
+};
+
+function getDomainName(domain) {
+    return domainNames[domain] || (domain.charAt(0).toUpperCase() + domain.slice(1).replace('_', ' ') + 's');
+}
+
 function renderTable() {
     if (filteredEntities.length === 0) {
         entityTableBody.innerHTML = `
@@ -213,18 +266,22 @@ function renderTable() {
     
     entityTableBody.innerHTML = '';
     
-    // Group entities by floor, then by room
+    // Group entities by floor, then by room, then by domain
     const groups = {};
     filteredEntities.forEach(e => {
         const floor = e.floor || 'No Floor';
         const room = e.area || 'No Room';
+        const domain = e.domain || 'No Domain';
         if (!groups[floor]) {
             groups[floor] = {};
         }
         if (!groups[floor][room]) {
-            groups[floor][room] = [];
+            groups[floor][room] = {};
         }
-        groups[floor][room].push(e);
+        if (!groups[floor][room][domain]) {
+            groups[floor][room][domain] = [];
+        }
+        groups[floor][room][domain].push(e);
     });
     
     // Sort floor names (put "No Floor" or "TBA" at the end)
@@ -290,53 +347,86 @@ function renderTable() {
                 return;
             }
             
-            const ents = roomsInFloor[room];
-            // Sort entities within the room by ID
-            ents.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+            const domainsInRoom = roomsInFloor[room];
+            const domainKeys = Object.keys(domainsInRoom).sort();
             
-            ents.forEach(e => {
-                const tr = document.createElement('tr');
-                tr.className = 'entity-row';
+            domainKeys.forEach(domain => {
+                const domainKey = `domain:${floor}:${room}:${domain}`;
+                const isDomainCollapsed = collapsedGroups.has(domainKey);
                 
-                // Filter out invalid/empty/0 nicknames
-                const validAliases = (e.aliases || []).filter(a => a && a !== '0' && a !== 0);
+                // Render Domain Header row
+                const domainTr = document.createElement('tr');
+                domainTr.className = 'domain-header-row';
+                domainTr.style.cursor = 'pointer';
+                domainTr.setAttribute('onclick', `toggleGroup('${domainKey}', event)`);
                 
-                // Aliases rendering with inline "Add" button
-                const aliasBadges = validAliases.map(a => `<span class="badge alias-badge">${a}</span>`).join(' ');
+                const domainChevron = isDomainCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
                 
-                // Expose status badge
-                let exposeBadge = '';
-                if (e.yaml_exposed && e.should_expose) {
-                    exposeBadge = `<span class="badge badge-exposed"><i class="fa-solid fa-circle-check" style="margin-right: 0.3rem;"></i>Exposed</span>`;
-                } else if (e.should_expose && !e.yaml_exposed) {
-                    exposeBadge = `<span class="badge badge-pending-expose"><i class="fa-solid fa-circle-pause" style="margin-right: 0.3rem;"></i>Pending Add</span>`;
-                } else if (!e.should_expose && e.yaml_exposed) {
-                    exposeBadge = `<span class="badge badge-pending-remove"><i class="fa-solid fa-circle-minus" style="margin-right: 0.3rem;"></i>Pending Remove</span>`;
-                } else {
-                    exposeBadge = `<span class="badge badge-not-exposed">No</span>`;
-                }
-                
-                tr.innerHTML = `
-                    <td class="entity-info-cell">
-                        <div class="entity-name"><strong>${e.display_name}</strong></div>
-                        <div class="entity-id-subtext">${e.entity_id}</div>
-                    </td>
-                    <td class="inline-aliases-cell">
-                        <div class="aliases-wrapper">
-                            <div class="aliases-badges-list">${aliasBadges || '<span class="no-aliases">None</span>'}</div>
-                            <button class="inline-add-alias-btn" onclick="openQuickAliasModal('${e.entity_id}', event)" title="Add nickname">
-                                <i class="fa-solid fa-plus"></i>
-                            </button>
-                        </div>
-                    </td>
-                    <td style="text-align: center;">${exposeBadge}</td>
-                    <td class="action-cell">
-                        <button class="action-btn" onclick="openEditModal('${e.entity_id}')" title="Edit Google Assistant Settings">
-                            <i class="fa-solid fa-pen-to-square"></i>
-                        </button>
+                domainTr.innerHTML = `
+                    <td colspan="4" class="domain-header-cell" style="padding-left: 2rem !important; font-size: 0.85rem; font-weight: 600; color: var(--outline);">
+                        <i class="fa-solid ${domainChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                        <i class="fa-solid fa-shapes"></i> ${getDomainName(domain)}
                     </td>
                 `;
-                entityTableBody.appendChild(tr);
+                entityTableBody.appendChild(domainTr);
+                
+                if (isDomainCollapsed) {
+                    return;
+                }
+                
+                const ents = domainsInRoom[domain];
+                // Sort entities within the domain by ID
+                ents.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+                
+                ents.forEach(e => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'entity-row';
+                    
+                    // Filter out invalid/empty/0 nicknames
+                    const validAliases = (e.aliases || []).filter(a => a && a !== '0' && a !== 0);
+                    
+                    // Aliases rendering with inline "Add" button
+                    const aliasBadges = validAliases.map(a => `<span class="badge alias-badge">${a}</span>`).join(' ');
+                    
+                    // Expose status badge
+                    let exposeBadge = '';
+                    if (e.yaml_exposed && e.should_expose) {
+                        exposeBadge = `<span class="badge badge-exposed"><i class="fa-solid fa-circle-check" style="margin-right: 0.3rem;"></i>Exposed</span>`;
+                    } else if (e.should_expose && !e.yaml_exposed) {
+                        exposeBadge = `<span class="badge badge-pending-expose"><i class="fa-solid fa-circle-pause" style="margin-right: 0.3rem;"></i>Pending Add</span>`;
+                    } else if (!e.should_expose && e.yaml_exposed) {
+                        exposeBadge = `<span class="badge badge-pending-remove"><i class="fa-solid fa-circle-minus" style="margin-right: 0.3rem;"></i>Pending Remove</span>`;
+                    } else {
+                        exposeBadge = `<span class="badge badge-not-exposed">No</span>`;
+                    }
+                    
+                    tr.innerHTML = `
+                        <td>
+                            <div class="entity-info-wrapper">
+                                <div class="entity-name"><strong>${e.display_name}</strong></div>
+                                <div class="entity-id-subtext">${e.entity_id}</div>
+                            </div>
+                        </td>
+                        <td class="inline-aliases-cell">
+                            <div class="aliases-wrapper">
+                                <div class="aliases-badges-list">${aliasBadges || '<span class="no-aliases">None</span>'}</div>
+                                <button class="inline-add-alias-btn" onclick="openQuickAliasModal('${e.entity_id}', event)" title="Add nickname">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td style="text-align: center;">${exposeBadge}</td>
+                        <td class="action-cell" style="white-space: nowrap;">
+                            <button class="action-btn" onclick="addToBlocklistDirectly('${e.entity_id}', event)" title="Block / Permanently Hide" style="color: var(--danger); margin-right: 0.25rem;">
+                                <i class="fa-solid fa-eye-slash"></i>
+                            </button>
+                            <button class="action-btn" onclick="openEditModal('${e.entity_id}')" title="Edit Google Assistant Settings">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                        </td>
+                    `;
+                    entityTableBody.appendChild(tr);
+                });
             });
         });
     });
@@ -633,3 +723,143 @@ function showToast(message, type = 'success') {
         toast.className = 'toast';
     }, 4000);
 }
+
+// Fetch blocklist patterns from backend
+async function fetchBlocklist() {
+    blocklistContainer.innerHTML = '<span style="color: var(--on-surface-variant); font-size: 0.9rem; font-style: italic;">Loading blocklist...</span>';
+    try {
+        const response = await fetch('/api/google_assistant_entity_console/blocklist', {
+            headers: getAuthHeaders()
+        });
+        if (!response.ok) throw new Error('Failed to fetch blocklist');
+        const data = await response.json();
+        renderBlocklist(data.blocklist || []);
+    } catch (error) {
+        showToast('Error loading blocklist: ' + error.message, 'error');
+        blocklistContainer.innerHTML = '<span style="color: var(--danger); font-size: 0.9rem;">Error loading blocklist patterns.</span>';
+    }
+}
+
+// Render blocklist in the container
+function renderBlocklist(patterns) {
+    blocklistContainer.innerHTML = '';
+    if (patterns.length === 0) {
+        blocklistContainer.innerHTML = '<span style="color: var(--on-surface-variant); font-size: 0.9rem; font-style: italic; padding: 0.5rem 0;">No blocked patterns defined yet.</span>';
+        return;
+    }
+    
+    patterns.forEach(pattern => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justify = 'space-between';
+        row.style.alignItems = 'center';
+        row.style.padding = '0.4rem 0.6rem';
+        row.style.backgroundColor = 'rgba(255,255,255,0.03)';
+        row.style.borderRadius = '6px';
+        row.style.border = '1px solid var(--border)';
+        
+        row.innerHTML = `
+            <code style="font-family: monospace; font-size: 0.9rem; color: var(--primary);">${pattern}</code>
+            <button class="action-btn" onclick="removeBlocklistPattern('${pattern.replace(/'/g, "\\'")}')" title="Remove Pattern" style="color: var(--danger); width: 1.8rem; height: 1.8rem; font-size: 0.95rem;">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+        `;
+        blocklistContainer.appendChild(row);
+    });
+}
+
+// Add a regex pattern to blocklist
+async function addBlocklistPattern(pattern) {
+    try {
+        const response = await fetch('/api/google_assistant_entity_console/blocklist/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ pattern })
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to add pattern');
+        }
+        newBlocklistPattern.value = '';
+        showToast('Pattern added to blocklist', 'success');
+        
+        // Refresh local view and fetch blocklist details
+        await fetchBlocklist();
+        await fetchEntities();
+    } catch (error) {
+        showToast('Error adding pattern: ' + error.message, 'error');
+    }
+}
+
+// Remove a regex pattern from blocklist
+async function removeBlocklistPattern(pattern) {
+    try {
+        // Fetch current list first
+        const getRes = await fetch('/api/google_assistant_entity_console/blocklist', {
+            headers: getAuthHeaders()
+        });
+        if (!getRes.ok) throw new Error('Failed to load current list');
+        const getData = await getRes.json();
+        
+        const updatedList = (getData.blocklist || []).filter(p => p !== pattern);
+        
+        const response = await fetch('/api/google_assistant_entity_console/blocklist', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ blocklist: updatedList })
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to update blocklist');
+        }
+        
+        showToast('Pattern removed from blocklist', 'success');
+        renderBlocklist(updatedList);
+        
+        // Refresh entities table
+        await fetchEntities();
+    } catch (error) {
+        showToast('Error removing pattern: ' + error.message, 'error');
+    }
+}
+
+// Hide an entity directly by adding exact regex pattern to blocklist
+window.addToBlocklistDirectly = async function(entityId, event) {
+    if (event) event.stopPropagation();
+    if (!confirm(`Are you sure you want to block and permanently hide ${entityId}?`)) {
+        return;
+    }
+    
+    // Create an exact match pattern
+    const pattern = `^${entityId.replace(/\./g, '\\.')}$`;
+    
+    try {
+        const response = await fetch('/api/google_assistant_entity_console/blocklist/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ pattern })
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to block entity');
+        }
+        
+        showToast(`${entityId} blocked and hidden`, 'success');
+        
+        // Remove locally from the array to immediately update UI
+        entities = entities.filter(e => e.entity_id !== entityId);
+        updateStats();
+        applyFilters();
+    } catch (error) {
+        showToast('Error blocking entity: ' + error.message, 'error');
+    }
+};

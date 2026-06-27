@@ -37,6 +37,29 @@ yaml.SafeDumper.add_representer(Secret, secret_representer)
 yaml.SafeDumper.add_representer(Include, include_representer)
 
 
+import json
+
+def load_blocklist(hass: HomeAssistant) -> list:
+    filepath = hass.config.path("google_assistant_entity_console_blocklist.json")
+    if not os.path.exists(filepath):
+        return []
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return data
+    except Exception as err:
+        _LOGGER.error("Failed to load blocklist: %s", err)
+    return []
+
+def save_blocklist(hass: HomeAssistant, blocklist: list):
+    filepath = hass.config.path("google_assistant_entity_console_blocklist.json")
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(blocklist, f, indent=2)
+    except Exception as err:
+        _LOGGER.error("Failed to save blocklist: %s", err)
+
 def _read_file_content(path):
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
@@ -116,6 +139,15 @@ async def async_fetch_entities_data(hass: HomeAssistant):
         device_area_map[device.id] = device.area_id
         device_name_map[device.id] = device.name_by_user or device.name
 
+    # Load blocklist
+    blocklist = load_blocklist(hass)
+    compiled_blocklist = []
+    for pattern in blocklist:
+        try:
+            compiled_blocklist.append(re.compile(pattern))
+        except re.error as err:
+            _LOGGER.error("Invalid regex in blocklist '%s': %s", pattern, err)
+
     active_entities = []
     for entry in ent_reg.entities.values():
         # Filter out disabled and hidden entities
@@ -123,6 +155,16 @@ async def async_fetch_entities_data(hass: HomeAssistant):
             continue
 
         entity_id = entry.entity_id
+
+        # Check blocklist
+        is_blocked = False
+        for rx in compiled_blocklist:
+            if rx.search(entity_id):
+                is_blocked = True
+                break
+        if is_blocked:
+            continue
+
         device_id = entry.device_id
         domain = entity_id.split(".")[0]
 
@@ -383,4 +425,67 @@ class RestartView(HomeAssistantView):
             return self.json({"success": True})
         except Exception as err:
             _LOGGER.exception("Failed to trigger Home Assistant restart")
+            return self.json({"error": str(err)}, status=500)
+
+
+class BlocklistView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/blocklist"
+    name = "api:google_assistant_entity_console:blocklist"
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            blocklist = load_blocklist(hass)
+            return self.json({"blocklist": blocklist})
+        except Exception as err:
+            _LOGGER.exception("Failed to get blocklist")
+            return self.json({"error": str(err)}, status=500)
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+            blocklist = body.get("blocklist")
+            if not isinstance(blocklist, list):
+                return self.json({"error": "Blocklist must be a list"}, status=400)
+            
+            # Syntax validation for regexes
+            for pattern in blocklist:
+                try:
+                    re.compile(pattern)
+                except re.error as err:
+                    return self.json({"error": f"Invalid regex pattern '{pattern}': {err}"}, status=400)
+
+            save_blocklist(hass, blocklist)
+            return self.json({"success": True, "blocklist": blocklist})
+        except Exception as err:
+            _LOGGER.exception("Failed to update blocklist")
+            return self.json({"error": str(err)}, status=500)
+
+
+class BlocklistAddView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/blocklist/add"
+    name = "api:google_assistant_entity_console:blocklist:add"
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+            pattern = body.get("pattern")
+            if not pattern:
+                return self.json({"error": "Missing pattern"}, status=400)
+
+            try:
+                re.compile(pattern)
+            except re.error as err:
+                return self.json({"error": f"Invalid regex pattern: {err}"}, status=400)
+
+            blocklist = load_blocklist(hass)
+            if pattern not in blocklist:
+                blocklist.append(pattern)
+                save_blocklist(hass, blocklist)
+
+            return self.json({"success": True, "blocklist": blocklist})
+        except Exception as err:
+            _LOGGER.exception("Failed to add to blocklist")
             return self.json({"error": str(err)}, status=500)

@@ -10,7 +10,7 @@ from homeassistant.components.frontend import (
 from homeassistant.components.http import StaticPathConfig
 
 from .const import DOMAIN
-from .views import EntitiesView, UpdateEntityView, RebuildView, RestartView
+from .views import EntitiesView, UpdateEntityView, RebuildView, RestartView, BlocklistView, BlocklistAddView
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +46,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.http.register_view(UpdateEntityView())
     hass.http.register_view(RebuildView())
     hass.http.register_view(RestartView())
+    hass.http.register_view(BlocklistView())
+    hass.http.register_view(BlocklistAddView())
 
     # 3. Register Sidebar Panel
     async_remove_panel(hass, DOMAIN, warn_if_unknown=False)

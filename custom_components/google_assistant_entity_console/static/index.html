@@ -28,7 +28,11 @@
                     <span id="appVersion">Entity Console</span>
                 </div>
             </div>
-            <div class="header-actions">
+            <div class="header-actions" style="display: flex; gap: 0.75rem;">
+                <button id="manageBlocklistBtn" class="btn btn-secondary">
+                    <i class="fa-solid fa-ban"></i>
+                    <span>Manage Blocklist</span>
+                </button>
                 <button id="rebuildBtn" class="btn btn-primary">
                     <i class="fa-solid fa-file-code"></i>
                     <span>Rebuild Config</span>
@@ -161,6 +165,31 @@
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Blocklist Manager Modal -->
+    <div id="blocklistModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Manage Regex Blocklist</h2>
+                <span class="close-modal" id="closeBlocklistModal">&times;</span>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
+                <p style="margin: 0; color: var(--on-surface-variant); font-size: 0.9rem; line-height: 1.4;">
+                    Entities matching these regex patterns will be permanently hidden from the Entity Console. E.g. <code>^sensor\..*_battery$</code>
+                </p>
+                <div class="alias-input-wrapper">
+                    <input type="text" id="newBlocklistPattern" placeholder="Add regex pattern (e.g. sensor.*_battery)" class="form-input">
+                    <button type="button" id="addBlocklistPatternBtn" class="btn btn-primary">Add</button>
+                </div>
+                <div id="blocklistContainer" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto; background-color: var(--surface-variant); padding: 0.75rem; border-radius: 12px; border: 1px solid var(--border);">
+                    <!-- Blocklist items rendered dynamically -->
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="closeBlocklistModalBtn">Close</button>
+            </div>
         </div>
     </div>
 

@@ -388,6 +388,10 @@ tr:hover td {
 
 /* Merged Entity Info Column */
 .entity-info-cell {
+    vertical-align: middle;
+}
+
+.entity-info-wrapper {
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
@@ -407,6 +411,16 @@ tr:hover td {
 .room-cell {
     font-weight: 500;
     color: var(--on-surface);
+}
+
+.domain-header-row {
+    background-color: transparent;
+    border-bottom: 1px solid var(--border);
+}
+
+.domain-header-cell {
+    padding: 0.5rem 1rem !important;
+    vertical-align: middle;
 }
 
 /* Action controls */
