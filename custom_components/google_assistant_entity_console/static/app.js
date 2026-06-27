@@ -207,6 +207,61 @@ window.toggleGroup = function(groupKey, event) {
     renderTable();
 };
 
+window.toggleSubGroups = function(parentType, parentId, collapse, event) {
+    if (event) event.stopPropagation();
+    
+    if (parentType === 'floor') {
+        const floorName = parentId;
+        // Find all rooms under this floor in the filtered entities list
+        const rooms = [...new Set(filteredEntities
+            .filter(e => (e.floor || 'No Floor') === floorName)
+            .map(e => e.area || 'No Room'))];
+            
+        rooms.forEach(r => {
+            const roomKey = `room:${floorName}:${r}`;
+            if (collapse) {
+                collapsedGroups.add(roomKey);
+            } else {
+                collapsedGroups.delete(roomKey);
+            }
+            
+            // Toggle domains under this room as well
+            const domains = [...new Set(filteredEntities
+                .filter(e => (e.floor || 'No Floor') === floorName && (e.area || 'No Room') === r)
+                .map(e => e.domain || 'No Domain'))];
+                
+            domains.forEach(d => {
+                const domainKey = `domain:${floorName}:${r}:${d}`;
+                if (collapse) {
+                    collapsedGroups.add(domainKey);
+                } else {
+                    collapsedGroups.delete(domainKey);
+                }
+            });
+        });
+    } else if (parentType === 'room') {
+        const parts = parentId.split(':');
+        const floorName = parts[0];
+        const roomName = parts[1];
+        
+        // Find all domains under this room
+        const domains = [...new Set(filteredEntities
+            .filter(e => (e.floor || 'No Floor') === floorName && (e.area || 'No Room') === roomName)
+            .map(e => e.domain || 'No Domain'))];
+            
+        domains.forEach(d => {
+            const domainKey = `domain:${floorName}:${roomName}:${d}`;
+            if (collapse) {
+                collapsedGroups.add(domainKey);
+            } else {
+                collapsedGroups.delete(domainKey);
+            }
+        });
+    }
+    
+    renderTable();
+};
+
 const domainNames = {
     light: 'Lights',
     switch: 'Switches',
@@ -281,8 +336,20 @@ function renderTable() {
         
         floorTr.innerHTML = `
             <td colspan="4" class="floor-header-cell">
-                <i class="fa-solid ${floorChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                <i class="fa-solid fa-layer-group"></i> Floor: ${floor}
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div>
+                        <i class="fa-solid ${floorChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                        <i class="fa-solid fa-layer-group"></i> Floor: ${floor}
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                        <button class="header-action-link" onclick="toggleSubGroups('floor', '${floor.replace(/'/g, "\\'")}', true, event)" title="Collapse all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fa-solid fa-angles-up"></i> Collapse Rooms
+                        </button>
+                        <button class="header-action-link" onclick="toggleSubGroups('floor', '${floor.replace(/'/g, "\\'")}', false, event)" title="Expand all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                            <i class="fa-solid fa-angles-down"></i> Expand Rooms
+                        </button>
+                    </div>
+                </div>
             </td>
         `;
         entityTableBody.appendChild(floorTr);
@@ -313,8 +380,20 @@ function renderTable() {
             
             roomTr.innerHTML = `
                 <td colspan="4" class="room-header-cell">
-                    <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                    <i class="fa-solid fa-door-open"></i> ${room}
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div>
+                            <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                            <i class="fa-solid fa-door-open"></i> ${room}
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                            <button class="header-action-link" onclick="toggleSubGroups('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', true, event)" title="Collapse all domains under this room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                <i class="fa-solid fa-angles-up"></i> Collapse Domains
+                            </button>
+                            <button class="header-action-link" onclick="toggleSubGroups('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', false, event)" title="Expand all domains under this room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                <i class="fa-solid fa-angles-down"></i> Expand Domains
+                            </button>
+                        </div>
+                    </div>
                 </td>
             `;
             entityTableBody.appendChild(roomTr);
