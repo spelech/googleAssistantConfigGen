@@ -181,14 +181,14 @@ function applyFilters() {
         // Query match
         const matchesQuery = !query || 
             e.entity_id.toLowerCase().includes(query) || 
-            e.display_name.toLowerCase().includes(query) || 
-            e.aliases.some(a => a.toLowerCase().includes(query));
+            (e.display_name || '').toLowerCase().includes(query) || 
+            (e.aliases || []).some(a => a && typeof a === 'string' && a.toLowerCase().includes(query));
             
         // Domain match
         const matchesDomain = domain === 'all' || e.domain === domain;
         
         // Room match
-        const matchesRoom = room === 'all' || e.area.toLowerCase() === room;
+        const matchesRoom = room === 'all' || (e.area || '').toLowerCase() === room;
         
         // Exposed match (either marked in registry or currently exposed in YAML)
         const matchesExposed = !exposedOnly || e.should_expose || e.yaml_exposed;
