@@ -102,45 +102,51 @@ async function fetchEntities() {
 
 // Event listeners setup
 function setupEventListeners() {
-    searchInput.addEventListener('input', applyFilters);
-    domainFilter.addEventListener('change', applyFilters);
-    roomFilter.addEventListener('change', applyFilters);
-    exposedOnlyCheckbox.addEventListener('change', applyFilters);
-    groupingType.addEventListener('change', applyFilters);
+    if (searchInput) searchInput.addEventListener('input', applyFilters);
+    if (domainFilter) domainFilter.addEventListener('change', applyFilters);
+    if (roomFilter) roomFilter.addEventListener('change', applyFilters);
+    if (exposedOnlyCheckbox) exposedOnlyCheckbox.addEventListener('change', applyFilters);
+    if (groupingType) groupingType.addEventListener('change', applyFilters);
     
     // Rebuild Button
-    rebuildBtn.addEventListener('click', handleRebuild);
+    if (rebuildBtn) rebuildBtn.addEventListener('click', handleRebuild);
     
-
-
     // Restart Modal controls
-    cancelRestartBtn.addEventListener('click', () => {
-        restartModal.style.display = 'none';
-    });
-    confirmRestartBtn.addEventListener('click', handleRestart);
+    if (cancelRestartBtn && restartModal) {
+        cancelRestartBtn.addEventListener('click', () => {
+            restartModal.style.display = 'none';
+        });
+    }
+    if (confirmRestartBtn) confirmRestartBtn.addEventListener('click', handleRestart);
 
     // Blocklist Modal controls
-    manageBlocklistBtn.addEventListener('click', () => {
-        fetchBlocklist();
-        blocklistModal.style.display = 'block';
-    });
+    if (manageBlocklistBtn && blocklistModal) {
+        manageBlocklistBtn.addEventListener('click', () => {
+            fetchBlocklist();
+            blocklistModal.style.display = 'block';
+        });
+    }
     const hideBlocklist = () => {
-        blocklistModal.style.display = 'none';
+        if (blocklistModal) blocklistModal.style.display = 'none';
     };
-    closeBlocklistModal.addEventListener('click', hideBlocklist);
-    closeBlocklistModalBtn.addEventListener('click', hideBlocklist);
+    if (closeBlocklistModal) closeBlocklistModal.addEventListener('click', hideBlocklist);
+    if (closeBlocklistModalBtn) closeBlocklistModalBtn.addEventListener('click', hideBlocklist);
     
-    addBlocklistPatternBtn.addEventListener('click', () => {
-        const val = newBlocklistPattern.value.trim();
-        if (val) addBlocklistPattern(val);
-    });
-    newBlocklistPattern.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
+    if (addBlocklistPatternBtn && newBlocklistPattern) {
+        addBlocklistPatternBtn.addEventListener('click', () => {
             const val = newBlocklistPattern.value.trim();
             if (val) addBlocklistPattern(val);
-        }
-    });
+        });
+    }
+    if (newBlocklistPattern) {
+        newBlocklistPattern.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const val = newBlocklistPattern.value.trim();
+                if (val) addBlocklistPattern(val);
+            }
+        });
+    }
 }
 
 function updateStats() {
