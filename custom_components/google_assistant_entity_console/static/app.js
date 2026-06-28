@@ -14,6 +14,7 @@ const roomFilter = document.getElementById('roomFilter');
 const exposedOnlyCheckbox = document.getElementById('exposedOnlyCheckbox');
 const entityTableBody = document.getElementById('entityTableBody');
 const rebuildBtn = document.getElementById('rebuildBtn');
+const groupingType = document.getElementById('groupingType');
 
 
 
@@ -105,6 +106,7 @@ function setupEventListeners() {
     domainFilter.addEventListener('change', applyFilters);
     roomFilter.addEventListener('change', applyFilters);
     exposedOnlyCheckbox.addEventListener('change', applyFilters);
+    groupingType.addEventListener('change', applyFilters);
     
     // Rebuild Button
     rebuildBtn.addEventListener('click', handleRebuild);
@@ -257,6 +259,53 @@ window.toggleSubGroups = function(parentType, parentId, collapse, event) {
                 collapsedGroups.delete(domainKey);
             }
         });
+    } else if (parentType === 'domain') {
+        const domainName = parentId;
+        // Find all floors under this domain
+        const floors = [...new Set(filteredEntities
+            .filter(e => (e.domain || 'No Domain') === domainName)
+            .map(e => e.floor || 'No Floor'))];
+            
+        floors.forEach(f => {
+            const floorKey = `floor:${domainName}:${f}`;
+            if (collapse) {
+                collapsedGroups.add(floorKey);
+            } else {
+                collapsedGroups.delete(floorKey);
+            }
+            
+            // Toggle rooms under this floor + domain combination
+            const rooms = [...new Set(filteredEntities
+                .filter(e => (e.domain || 'No Domain') === domainName && (e.floor || 'No Floor') === f)
+                .map(e => e.area || 'No Room'))];
+                
+            rooms.forEach(r => {
+                const roomKey = `room:${domainName}:${f}:${r}`;
+                if (collapse) {
+                    collapsedGroups.add(roomKey);
+                } else {
+                    collapsedGroups.delete(roomKey);
+                }
+            });
+        });
+    } else if (parentType === 'domain-floor') {
+        const parts = parentId.split(':');
+        const domainName = parts[0];
+        const floorName = parts[1];
+        
+        // Find all rooms under this domain and floor combination
+        const rooms = [...new Set(filteredEntities
+            .filter(e => (e.domain || 'No Domain') === domainName && (e.floor || 'No Floor') === floorName)
+            .map(e => e.area || 'No Room'))];
+            
+        rooms.forEach(r => {
+            const roomKey = `room:${domainName}:${floorName}:${r}`;
+            if (collapse) {
+                collapsedGroups.add(roomKey);
+            } else {
+                collapsedGroups.delete(roomKey);
+            }
+        });
     }
     
     renderTable();
@@ -279,8 +328,36 @@ const domainNames = {
     valve: 'Valves'
 };
 
+const entityIcons = {
+    light: 'fa-lightbulb',
+    switch: 'fa-toggle-on',
+    media_player: 'fa-tv',
+    fan: 'fa-fan',
+    sensor: 'fa-gauge-simple-high',
+    binary_sensor: 'fa-circle-dot',
+    cover: 'fa-window-maximize',
+    climate: 'fa-temperature-three-quarters',
+    lock: 'fa-lock',
+    vacuum: 'fa-robot',
+    camera: 'fa-video',
+    scene: 'fa-palette',
+    script: 'fa-scroll',
+    valve: 'fa-faucet',
+    alarm_control_panel: 'fa-shield-halved',
+    button: 'fa-hand-pointer',
+    group: 'fa-users',
+    humidifier: 'fa-droplet',
+    lawn_mower: 'fa-tractor',
+    select: 'fa-list',
+    water_heater: 'fa-fire'
+};
+
 function getDomainName(domain) {
     return domainNames[domain] || (domain.charAt(0).toUpperCase() + domain.slice(1).replace('_', ' ') + 's');
+}
+
+function getEntityIcon(domain) {
+    return entityIcons[domain] || 'fa-gear';
 }
 
 function renderTable() {
@@ -297,197 +374,343 @@ function renderTable() {
     
     entityTableBody.innerHTML = '';
     
-    // Group entities by floor, then by room, then by domain
-    const groups = {};
-    filteredEntities.forEach(e => {
-        const floor = e.floor || 'No Floor';
-        const room = e.area || 'No Room';
-        const domain = e.domain || 'No Domain';
-        if (!groups[floor]) {
-            groups[floor] = {};
-        }
-        if (!groups[floor][room]) {
-            groups[floor][room] = {};
-        }
-        if (!groups[floor][room][domain]) {
-            groups[floor][room][domain] = [];
-        }
-        groups[floor][room][domain].push(e);
-    });
+    const isDomainGrouping = (groupingType && groupingType.value === 'domain');
     
-    // Sort floor names (put "No Floor" or "TBA" at the end)
-    const floorNames = Object.keys(groups).sort((a, b) => {
-        if (a === 'No Floor' || a === 'TBA') return 1;
-        if (b === 'No Floor' || b === 'TBA') return -1;
-        return a.localeCompare(b);
-    });
-    
-    floorNames.forEach(floor => {
-        const floorKey = `floor:${floor}`;
-        const isFloorCollapsed = collapsedGroups.has(floorKey);
-        
-        // Render Floor Header row
-        const floorTr = document.createElement('tr');
-        floorTr.className = 'floor-header-row';
-        floorTr.style.cursor = 'pointer';
-        floorTr.setAttribute('onclick', `toggleGroup('${floorKey}', event)`);
-        
-        const floorChevron = isFloorCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
-        
-        floorTr.innerHTML = `
-            <td colspan="4" class="floor-header-cell">
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <div>
-                        <i class="fa-solid ${floorChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                        <i class="fa-solid fa-layer-group"></i> Floor: ${floor}
-                    </div>
-                    <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
-                        <button class="header-action-link" onclick="toggleSubGroups('floor', '${floor.replace(/'/g, "\\'")}', true, event)" title="Collapse all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                            <i class="fa-solid fa-angles-up"></i> Collapse Rooms
-                        </button>
-                        <button class="header-action-link" onclick="toggleSubGroups('floor', '${floor.replace(/'/g, "\\'")}', false, event)" title="Expand all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                            <i class="fa-solid fa-angles-down"></i> Expand Rooms
-                        </button>
-                    </div>
-                </div>
-            </td>
-        `;
-        entityTableBody.appendChild(floorTr);
-        
-        if (isFloorCollapsed) {
-            return;
-        }
-        
-        const roomsInFloor = groups[floor];
-        // Sort room names (put "No Room" or "TBA" at the end)
-        const roomNames = Object.keys(roomsInFloor).sort((a, b) => {
-            if (a === 'No Room' || a === 'TBA') return 1;
-            if (b === 'No Room' || b === 'TBA') return -1;
-            return a.localeCompare(b);
+    if (isDomainGrouping) {
+        // Group by Domain -> Floor -> Room
+        const groups = {};
+        filteredEntities.forEach(e => {
+            const domain = e.domain || 'No Domain';
+            const floor = e.floor || 'No Floor';
+            const room = e.area || 'No Room';
+            if (!groups[domain]) {
+                groups[domain] = {};
+            }
+            if (!groups[domain][floor]) {
+                groups[domain][floor] = {};
+            }
+            if (!groups[domain][floor][room]) {
+                groups[domain][floor][room] = [];
+            }
+            groups[domain][floor][room].push(e);
         });
         
-        roomNames.forEach(room => {
-            const roomKey = `room:${floor}:${room}`;
-            const isRoomCollapsed = collapsedGroups.has(roomKey);
+        const sortedDomains = Object.keys(groups).sort();
+        
+        sortedDomains.forEach(domain => {
+            const domainKey = `domain:${domain}`;
+            const isDomainCollapsed = collapsedGroups.has(domainKey);
             
-            // Render Room Header row
-            const roomTr = document.createElement('tr');
-            roomTr.className = 'room-header-row';
-            roomTr.style.cursor = 'pointer';
-            roomTr.setAttribute('onclick', `toggleGroup('${roomKey}', event)`);
+            // Domain Header
+            const domainTr = document.createElement('tr');
+            domainTr.className = 'domain-header-row';
+            domainTr.style.cursor = 'pointer';
+            domainTr.setAttribute('onclick', `toggleGroup('${domainKey}', event)`);
             
-            const roomChevron = isRoomCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
+            const domainChevron = isDomainCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
             
-            roomTr.innerHTML = `
-                <td colspan="4" class="room-header-cell">
+            domainTr.innerHTML = `
+                <td colspan="4" class="domain-header-cell">
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                         <div>
-                            <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                            <i class="fa-solid fa-door-open"></i> ${room}
+                            <i class="fa-solid ${domainChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                            <i class="fa-solid ${getEntityIcon(domain)}" style="margin-right: 0.25rem;"></i> ${getDomainName(domain)}
                         </div>
                         <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
-                            <button class="header-action-link" onclick="toggleSubGroups('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', true, event)" title="Collapse all domains under this room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                <i class="fa-solid fa-angles-up"></i> Collapse Domains
+                            <button class="header-action-link" onclick="toggleSubGroups('domain', '${domain.replace(/'/g, "\\'")}', true, event)" title="Collapse all floors under this domain" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                <i class="fa-solid fa-angles-up"></i> Collapse Floors
                             </button>
-                            <button class="header-action-link" onclick="toggleSubGroups('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', false, event)" title="Expand all domains under this room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                <i class="fa-solid fa-angles-down"></i> Expand Domains
+                            <button class="header-action-link" onclick="toggleSubGroups('domain', '${domain.replace(/'/g, "\\'")}', false, event)" title="Expand all floors under this domain" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                <i class="fa-solid fa-angles-down"></i> Expand Floors
                             </button>
                         </div>
                     </div>
                 </td>
             `;
-            entityTableBody.appendChild(roomTr);
+            entityTableBody.appendChild(domainTr);
             
-            if (isRoomCollapsed) {
+            if (isDomainCollapsed) return;
+            
+            const floorsInDomain = groups[domain];
+            const sortedFloors = Object.keys(floorsInDomain).sort((a, b) => {
+                if (a === 'No Floor' || a === 'TBA') return 1;
+                if (b === 'No Floor' || b === 'TBA') return -1;
+                return a.localeCompare(b);
+            });
+            
+            sortedFloors.forEach(floor => {
+                const floorKey = `floor:${domain}:${floor}`;
+                const isFloorCollapsed = collapsedGroups.has(floorKey);
+                
+                // Floor Header under Domain
+                const floorTr = document.createElement('tr');
+                floorTr.className = 'floor-header-row';
+                floorTr.style.cursor = 'pointer';
+                floorTr.setAttribute('onclick', `toggleGroup('${floorKey}', event)`);
+                
+                const floorChevron = isFloorCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
+                
+                floorTr.innerHTML = `
+                    <td colspan="4" class="floor-header-cell" style="padding-left: 2rem !important; font-size: 0.9rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <div>
+                                <i class="fa-solid ${floorChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                                <i class="fa-solid fa-layer-group"></i> Floor: ${floor}
+                            </div>
+                            <div style="display: flex; gap: 0.75rem; font-size: 0.7rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                                <button class="header-action-link" onclick="toggleSubGroups('domain-floor', '${domain.replace(/'/g, "\\'")}:${floor.replace(/'/g, "\\'")}', true, event)" title="Collapse all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                    <i class="fa-solid fa-angles-up"></i> Collapse Rooms
+                                </button>
+                                <button class="header-action-link" onclick="toggleSubGroups('domain-floor', '${domain.replace(/'/g, "\\'")}:${floor.replace(/'/g, "\\'")}', false, event)" title="Expand all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                    <i class="fa-solid fa-angles-down"></i> Expand Rooms
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                entityTableBody.appendChild(floorTr);
+                
+                if (isFloorCollapsed) return;
+                
+                const roomsInFloor = floorsInDomain[floor];
+                const sortedRooms = Object.keys(roomsInFloor).sort((a, b) => {
+                    if (a === 'No Room' || a === 'TBA') return 1;
+                    if (b === 'No Room' || b === 'TBA') return -1;
+                    return a.localeCompare(b);
+                });
+                
+                sortedRooms.forEach(room => {
+                    const roomKey = `room:${domain}:${floor}:${room}`;
+                    const isRoomCollapsed = collapsedGroups.has(roomKey);
+                    
+                    // Room Header under Floor
+                    const roomTr = document.createElement('tr');
+                    roomTr.className = 'room-header-row';
+                    roomTr.style.cursor = 'pointer';
+                    roomTr.setAttribute('onclick', `toggleGroup('${roomKey}', event)`);
+                    
+                    const roomChevron = isRoomCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
+                    
+                    roomTr.innerHTML = `
+                        <td colspan="4" class="room-header-cell" style="padding-left: 3rem !important; font-size: 0.85rem;">
+                            <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                            <i class="fa-solid fa-door-open"></i> ${room}
+                        </td>
+                    `;
+                    entityTableBody.appendChild(roomTr);
+                    
+                    if (isRoomCollapsed) return;
+                    
+                    const ents = roomsInFloor[room];
+                    ents.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+                    
+                    ents.forEach(e => {
+                        renderEntityRow(e);
+                    });
+                });
+            });
+        });
+    } else {
+        // Group entities by floor, then by room, then by domain (Default Floor-first grouping)
+        const groups = {};
+        filteredEntities.forEach(e => {
+            const floor = e.floor || 'No Floor';
+            const room = e.area || 'No Room';
+            const domain = e.domain || 'No Domain';
+            if (!groups[floor]) {
+                groups[floor] = {};
+            }
+            if (!groups[floor][room]) {
+                groups[floor][room] = {};
+            }
+            if (!groups[floor][room][domain]) {
+                groups[floor][room][domain] = [];
+            }
+            groups[floor][room][domain].push(e);
+        });
+        
+        // Sort floor names (put "No Floor" or "TBA" at the end)
+        const floorNames = Object.keys(groups).sort((a, b) => {
+            if (a === 'No Floor' || a === 'TBA') return 1;
+            if (b === 'No Floor' || b === 'TBA') return -1;
+            return a.localeCompare(b);
+        });
+        
+        floorNames.forEach(floor => {
+            const floorKey = `floor:${floor}`;
+            const isFloorCollapsed = collapsedGroups.has(floorKey);
+            
+            // Render Floor Header row
+            const floorTr = document.createElement('tr');
+            floorTr.className = 'floor-header-row';
+            floorTr.style.cursor = 'pointer';
+            floorTr.setAttribute('onclick', `toggleGroup('${floorKey}', event)`);
+            
+            const floorChevron = isFloorCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
+            
+            floorTr.innerHTML = `
+                <td colspan="4" class="floor-header-cell">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div>
+                            <i class="fa-solid ${floorChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                            <i class="fa-solid fa-layer-group"></i> Floor: ${floor}
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                            <button class="header-action-link" onclick="toggleSubGroups('floor', '${floor.replace(/'/g, "\\'")}', true, event)" title="Collapse all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                <i class="fa-solid fa-angles-up"></i> Collapse Rooms
+                            </button>
+                            <button class="header-action-link" onclick="toggleSubGroups('floor', '${floor.replace(/'/g, "\\'")}', false, event)" title="Expand all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                <i class="fa-solid fa-angles-down"></i> Expand Rooms
+                            </button>
+                        </div>
+                    </div>
+                </td>
+            `;
+            entityTableBody.appendChild(floorTr);
+            
+            if (isFloorCollapsed) {
                 return;
             }
             
-            const domainsInRoom = roomsInFloor[room];
-            const domainKeys = Object.keys(domainsInRoom).sort();
+            const roomsInFloor = groups[floor];
+            // Sort room names (put "No Room" or "TBA" at the end)
+            const roomNames = Object.keys(roomsInFloor).sort((a, b) => {
+                if (a === 'No Room' || a === 'TBA') return 1;
+                if (b === 'No Room' || b === 'TBA') return -1;
+                return a.localeCompare(b);
+            });
             
-            domainKeys.forEach(domain => {
-                const domainKey = `domain:${floor}:${room}:${domain}`;
-                const isDomainCollapsed = collapsedGroups.has(domainKey);
+            roomNames.forEach(room => {
+                const roomKey = `room:${floor}:${room}`;
+                const isRoomCollapsed = collapsedGroups.has(roomKey);
                 
-                // Render Domain Header row
-                const domainTr = document.createElement('tr');
-                domainTr.className = 'domain-header-row';
-                domainTr.style.cursor = 'pointer';
-                domainTr.setAttribute('onclick', `toggleGroup('${domainKey}', event)`);
+                // Render Room Header row
+                const roomTr = document.createElement('tr');
+                roomTr.className = 'room-header-row';
+                roomTr.style.cursor = 'pointer';
+                roomTr.setAttribute('onclick', `toggleGroup('${roomKey}', event)`);
                 
-                const domainChevron = isDomainCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
+                const roomChevron = isRoomCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
                 
-                domainTr.innerHTML = `
-                    <td colspan="4" class="domain-header-cell" style="padding-left: 2rem !important; font-size: 0.85rem; font-weight: 600; color: var(--outline);">
-                        <i class="fa-solid ${domainChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                        <i class="fa-solid fa-shapes"></i> ${getDomainName(domain)}
+                roomTr.innerHTML = `
+                    <td colspan="4" class="room-header-cell">
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <div>
+                                <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                                <i class="fa-solid fa-door-open"></i> ${room}
+                            </div>
+                            <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                                <button class="header-action-link" onclick="toggleSubGroups('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', true, event)" title="Collapse all domains under this room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                    <i class="fa-solid fa-angles-up"></i> Collapse Domains
+                                </button>
+                                <button class="header-action-link" onclick="toggleSubGroups('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', false, event)" title="Expand all domains under this room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                    <i class="fa-solid fa-angles-down"></i> Expand Domains
+                                </button>
+                            </div>
+                        </div>
                     </td>
                 `;
-                entityTableBody.appendChild(domainTr);
+                entityTableBody.appendChild(roomTr);
                 
-                if (isDomainCollapsed) {
+                if (isRoomCollapsed) {
                     return;
                 }
                 
-                const ents = domainsInRoom[domain];
-                // Sort entities within the domain by ID
-                ents.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+                const domainsInRoom = roomsInFloor[room];
+                const domainKeys = Object.keys(domainsInRoom).sort();
                 
-                ents.forEach(e => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'entity-row';
+                domainKeys.forEach(domain => {
+                    const domainKey = `domain:${floor}:${room}:${domain}`;
+                    const isDomainCollapsed = collapsedGroups.has(domainKey);
                     
-                    // Filter out invalid/empty/0 nicknames
-                    const validAliases = (e.aliases || []).filter(a => a && a !== '0' && a !== 0);
+                    // Render Domain Header row
+                    const domainTr = document.createElement('tr');
+                    domainTr.className = 'domain-header-row';
+                    domainTr.style.cursor = 'pointer';
+                    domainTr.setAttribute('onclick', `toggleGroup('${domainKey}', event)`);
                     
-                    // Aliases rendering with direct click-to-remove and inline "Add" button
-                    const aliasBadges = validAliases.map(a => `
-                        <span class="badge alias-badge" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.5rem;">
-                            ${a}
-                            <i class="fa-solid fa-xmark" onclick="removeAliasDirectly('${e.entity_id}', '${a.replace(/'/g, "\\'")}', event)" style="cursor: pointer; font-size: 0.75rem; color: var(--on-surface-variant); transition: color 0.15s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--on-surface-variant)'" title="Remove nickname"></i>
-                        </span>
-                    `).join(' ');
+                    const domainChevron = isDomainCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
                     
-                    // Expose status badge (directly togglable on click)
-                    let exposeBadge = '';
-                    if (e.yaml_exposed && e.should_expose) {
-                        exposeBadge = `<span class="badge badge-exposed" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure"><i class="fa-solid fa-circle-check" style="margin-right: 0.3rem;"></i>Exposed</span>`;
-                    } else if (e.should_expose && !e.yaml_exposed) {
-                        exposeBadge = `<span class="badge badge-pending-expose" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure"><i class="fa-solid fa-circle-pause" style="margin-right: 0.3rem;"></i>Pending Add</span>`;
-                    } else if (!e.should_expose && e.yaml_exposed) {
-                        exposeBadge = `<span class="badge badge-pending-remove" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure"><i class="fa-solid fa-circle-minus" style="margin-right: 0.3rem;"></i>Pending Remove</span>`;
-                    } else {
-                        exposeBadge = `<span class="badge badge-not-exposed" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure">No</span>`;
-                    }
-                    
-                    tr.innerHTML = `
-                        <td>
-                            <div class="entity-info-wrapper">
-                                <div class="entity-name-wrapper" style="display: inline-flex; align-items: center; gap: 0.4rem;">
-                                    <div class="entity-name"><strong>${e.display_name}</strong></div>
-                                    <button class="inline-edit-name-btn" onclick="openEditNameInline('${e.entity_id}', event)" title="Rename Entity" style="background: none; border: none; cursor: pointer; font-size: 0.75rem; padding: 0.2rem;">
-                                        <i class="fa-solid fa-pencil"></i>
-                                    </button>
-                                </div>
-                                <div class="entity-id-subtext">${e.entity_id}</div>
-                            </div>
-                        </td>
-                        <td class="inline-aliases-cell">
-                            <div class="aliases-wrapper">
-                                <div class="aliases-badges-list">${aliasBadges || '<span class="no-aliases">None</span>'}</div>
-                                <button class="inline-add-alias-btn" onclick="openQuickAliasModal('${e.entity_id}', event)" title="Add nickname">
-                                    <i class="fa-solid fa-plus"></i>
-                                </button>
-                            </div>
-                        </td>
-                        <td style="text-align: center;">${exposeBadge}</td>
-                        <td class="action-cell">
-                            <button class="action-btn" onclick="addToBlocklistDirectly('${e.entity_id}', event)" title="Block / Permanently Hide" style="color: var(--danger);">
-                                <i class="fa-solid fa-eye-slash"></i>
-                            </button>
+                    domainTr.innerHTML = `
+                        <td colspan="4" class="domain-header-cell" style="padding-left: 2rem !important; font-size: 0.85rem; font-weight: 600; color: var(--outline);">
+                            <i class="fa-solid ${domainChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                            <i class="fa-solid ${getEntityIcon(domain)}" style="margin-right: 0.25rem;"></i> ${getDomainName(domain)}
                         </td>
                     `;
-                    entityTableBody.appendChild(tr);
+                    entityTableBody.appendChild(domainTr);
+                    
+                    if (isDomainCollapsed) {
+                        return;
+                    }
+                    
+                    const ents = domainsInRoom[domain];
+                    ents.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
+                    
+                    ents.forEach(e => {
+                        renderEntityRow(e);
+                    });
+                });
+            });
+        });
+    }
+}
+
+function renderEntityRow(e) {
+    const tr = document.createElement('tr');
+    tr.className = 'entity-row';
+    
+    // Filter out invalid/empty/0 nicknames
+    const validAliases = (e.aliases || []).filter(a => a && a !== '0' && a !== 0);
+    
+    // Aliases rendering with direct click-to-remove and inline "Add" button
+    const aliasBadges = validAliases.map(a => `
+        <span class="badge alias-badge" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.5rem;">
+            ${a}
+            <i class="fa-solid fa-xmark" onclick="removeAliasDirectly('${e.entity_id}', '${a.replace(/'/g, "\\'")}', event)" style="cursor: pointer; font-size: 0.75rem; color: var(--on-surface-variant); transition: color 0.15s;" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--on-surface-variant)'" title="Remove nickname"></i>
+        </span>
+    `).join(' ');
+    
+    // Expose status badge (directly togglable on click)
+    let exposeBadge = '';
+    if (e.yaml_exposed && e.should_expose) {
+        exposeBadge = `<span class="badge badge-exposed" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure"><i class="fa-solid fa-circle-check" style="margin-right: 0.3rem;"></i>Exposed</span>`;
+    } else if (e.should_expose && !e.yaml_exposed) {
+        exposeBadge = `<span class="badge badge-pending-expose" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure"><i class="fa-solid fa-circle-pause" style="margin-right: 0.3rem;"></i>Pending Add</span>`;
+    } else if (!e.should_expose && e.yaml_exposed) {
+        exposeBadge = `<span class="badge badge-pending-remove" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure"><i class="fa-solid fa-circle-minus" style="margin-right: 0.3rem;"></i>Pending Remove</span>`;
+    } else {
+        exposeBadge = `<span class="badge badge-not-exposed" onclick="toggleExposeDirectly('${e.entity_id}', event)" title="Click to toggle exposure">No</span>`;
+    }
+    
+    tr.innerHTML = `
+        <td>
+            <div class="entity-info-wrapper">
+                <div class="entity-name-wrapper" style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                    <i class="fa-solid ${getEntityIcon(e.domain)}" style="color: var(--primary); margin-right: 0.15rem; font-size: 0.95rem;"></i>
+                    <div class="entity-name"><strong>${e.display_name}</strong></div>
+                    <button class="inline-edit-name-btn" onclick="openEditNameInline('${e.entity_id}', event)" title="Rename Entity" style="background: none; border: none; cursor: pointer; font-size: 0.75rem; padding: 0.2rem;">
+                        <i class="fa-solid fa-pencil"></i>
+                    </button>
+                </div>
+                <div class="entity-id-subtext">${e.entity_id}</div>
+            </div>
+        </td>
+        <td class="inline-aliases-cell">
+            <div class="aliases-wrapper">
+                <div class="aliases-badges-list">${aliasBadges || '<span class="no-aliases">None</span>'}</div>
+                <button class="inline-add-alias-btn" onclick="openQuickAliasModal('${e.entity_id}', event)" title="Add nickname">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+        </td>
+        <td style="text-align: center;">${exposeBadge}</td>
+        <td class="action-cell">
+            <button class="action-btn" onclick="addToBlocklistDirectly('${e.entity_id}', event)" title="Block / Permanently Hide" style="color: var(--danger);">
+                <i class="fa-solid fa-eye-slash"></i>
+            </button>
+        </td>
+    `;
+    entityTableBody.appendChild(tr);
                 });
             });
         });
