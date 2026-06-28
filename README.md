@@ -1,30 +1,22 @@
 # Google Assistant Entity Console
 
-<p align="center">
-  <img src="logo.png" alt="Google Sync Logo" width="200" height="200">
-</p>
+Google Assistant Entity Console is a native Home Assistant custom component that provides a direct sidebar dashboard to manage which entities are exposed to Google Assistant, update friendly names and aliases (nicknames) inline, and maintain a regex-supported blocklist. 
 
-Google Assistant Entity Console is a native Home Assistant custom component that provides a sidebar dashboard UI to manage which entities are exposed to Google Assistant, update their friendly names and aliases, generate the configuration YAML, and trigger reloads and syncs.
+It acts as a clean configuration manager, eliminating the need to write complex manual YAML blocks or restart/reload configurations by hand.
 
-It replaces standalone proxy containers and connects directly to Home Assistant registries.
+## Key Features
 
-## Features
-
-- Native integration running inside the Home Assistant process.
-- Programmatic sidebar panel registration.
-- Dynamic entity loading directly from Home Assistant entity, device, and area registries.
-- Custom names and alias badges update entity registry parameters.
-- One-click configuration generator that formats, validates, writes dated configuration files, updates the include reference in configuration.yaml, and reloads core configs before requesting a Google Assistant sync.
-- Secure, session-based authentication using Home Assistant's local credentials.
-
-## Requirements
-
-Before using this console, ensure you have:
-1. The built-in Google Assistant integration configured in Home Assistant.
-2. A line referencing the configuration file in your main `configuration.yaml` matching this pattern:
-   ```yaml
-   google_assistant: !include gaGen_062226.yaml
-   ```
+- **Native Integration**: Runs entirely inside the Home Assistant process and registers a clean panel in your sidebar.
+- **Dual Grouping Layouts**: 
+  - **Location-first (default)**: Groups entities by Floor -> Room -> Domain.
+  - **Domain-first (alternate)**: Groups entities by Domain -> Floor -> Room.
+- **Batch Actions**: One-click collapse and expand controls for nested child sections (e.g. collapse all rooms on a floor or collapse all domains in a room).
+- **Direct Row Interactions**:
+  - **Click-to-Toggle Status**: Click directly on the exposed status badge (*Exposed*, *Pending Add*, *Pending Remove*, *No*) to toggle it.
+  - **Inline Renaming**: Hover over the friendly name and click the pencil icon to rename the entity in place.
+  - **Nickname Badges**: View, add, and remove aliases (nicknames) directly on the entity row.
+- **Regex Blocklist Manager**: Permanently hide entities using regular expression patterns. Use the header manager modal or click the block button on any entity row to generate a precise blocklist pattern.
+- **Independent Generation & Restart**: Rebuild the YAML configuration file dynamically and choose whether to perform a restart to apply the modifications immediately.
 
 ## Installation
 
@@ -32,9 +24,9 @@ Before using this console, ensure you have:
 
 1. Open HACS in Home Assistant.
 2. Click the three dots in the top-right corner and select **Custom repositories**.
-3. Paste the URL of this repository: `https://github.com/spelech/googleAssistantConfigGen`
-4. Select **Integration** as the category and click **Add**.
-5. Find the **Google Assistant Entity Console** card in HACS, click **Download**, and select the latest version.
+3. Paste the repository URL: `https://github.com/spelech/googleAssistantConfigGen`
+4. Choose **Integration** as the category and click **Add**.
+5. Find **Google Assistant Entity Console** in HACS, click **Download**, and select the latest version.
 6. Restart Home Assistant.
 
 ### Method 2: Manual Installation
@@ -45,10 +37,31 @@ Before using this console, ensure you have:
 
 ## Configuration
 
-To activate the console, add the integration domain to your `configuration.yaml`:
+To activate the integration and register the sidebar panel, add the following key to your `configuration.yaml` file:
 
 ```yaml
 google_assistant_entity_console:
 ```
 
-Once Home Assistant restarts, the **Google Sync** link will appear in your sidebar.
+Restart Home Assistant to apply the configuration. A new **Google Sync** link will appear in your sidebar.
+
+### Connecting to Google Assistant
+
+Before generating configurations, make sure the built-in Google Assistant integration is configured and linked. Add a line referencing the configuration file in your main `configuration.yaml` matching this pattern:
+
+```yaml
+google_assistant: !include gaGen_062226.yaml
+```
+
+The console will automatically detect, read, and write to the active configuration file.
+
+## Screenshot Previews
+
+### Location-first Layout (Floor > Room > Domain)
+![Location Grouping Preview](brand/dashboard_location_view.png)
+
+### Domain-first Layout (Domain > Floor > Room)
+![Domain Grouping Preview](brand/dashboard_domain_view.png)
+
+### Regex Blocklist Manager
+![Blocklist Modal Preview](brand/blocklist_modal_view.png)
