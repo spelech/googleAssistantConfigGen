@@ -717,10 +717,6 @@ function renderEntityRow(e) {
         </td>
     `;
     entityTableBody.appendChild(tr);
-                });
-            });
-        });
-    });
 }
 
 // Inline Quick Nickname Input Handler
