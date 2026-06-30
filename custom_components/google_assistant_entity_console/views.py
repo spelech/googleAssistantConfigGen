@@ -507,3 +507,258 @@ class BlocklistAddView(HomeAssistantView):
         except Exception as err:
             _LOGGER.exception("Failed to add to blocklist")
             return self.json({"error": str(err)}, status=500)
+
+
+# AI Settings Storage Helpers
+def load_ai_settings(hass: HomeAssistant) -> dict:
+    filepath = hass.config.path("google_assistant_entity_console_ai_settings.json")
+    if not os.path.exists(filepath):
+        return {}
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                return data
+    except Exception as err:
+        _LOGGER.error("Failed to load AI settings: %s", err)
+    return {}
+
+def save_ai_settings(hass: HomeAssistant, settings: dict):
+    filepath = hass.config.path("google_assistant_entity_console_ai_settings.json")
+    try:
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=2)
+    except Exception as err:
+        _LOGGER.error("Failed to save AI settings: %s", err)
+
+
+# AI API Views
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+class AISettingsView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/ai/settings"
+    name = "api:google_assistant_entity_console:ai:settings"
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            settings = load_ai_settings(hass)
+            return self.json({"settings": settings})
+        except Exception as err:
+            return self.json({"error": str(err)}, status=500)
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+            settings = body.get("settings", {})
+            if not isinstance(settings, dict):
+                return self.json({"error": "Settings must be a dictionary"}, status=400)
+            
+            save_ai_settings(hass, settings)
+            return self.json({"success": True, "settings": settings})
+        except Exception as err:
+            return self.json({"error": str(err)}, status=500)
+
+
+class AIModelsView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/ai/models"
+    name = "api:google_assistant_entity_console:ai:models"
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+            base_url = body.get("base_url", "").rstrip("/")
+            api_key = body.get("api_key", "")
+            
+            if not base_url:
+                return self.json({"error": "Missing base URL"}, status=400)
+                
+            session = async_get_clientsession(hass)
+            headers = {}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+                
+            async with session.get(f"{base_url}/models", headers=headers, timeout=10) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    return self.json({"error": f"Failed to fetch models (HTTP {resp.status}): {text}"}, status=resp.status)
+                
+                data = await resp.json()
+                models = []
+                if isinstance(data, dict) and "data" in data:
+                    for item in data["data"]:
+                        if isinstance(item, dict) and "id" in item:
+                            models.append(item["id"])
+                elif isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and "id" in item:
+                            models.append(item["id"])
+                            
+                return self.json({"models": sorted(models)})
+        except Exception as err:
+            _LOGGER.exception("Failed to query models")
+            return self.json({"error": str(err)}, status=500)
+
+
+class AIGenerateNicknamesView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/ai/generate_nicknames"
+    name = "api:google_assistant_entity_console:ai:generate_nicknames"
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+            entities_to_gen = body.get("entities", [])
+            if not entities_to_gen:
+                return self.json({"error": "No entities provided"}, status=400)
+                
+            settings = load_ai_settings(hass)
+            base_url = settings.get("base_url", "").rstrip("/")
+            api_key = settings.get("api_key", "")
+            model = settings.get("model", "")
+            prompt_template = settings.get("nickname_prompt", "").strip()
+            
+            # Default fallback template
+            if not prompt_template:
+                prompt_template = (
+                    "You are an assistant helping configure Google Assistant aliases for smart home entities.\n"
+                    "For the following entity, generate 2-4 clean, natural-language nicknames (aliases) that a user would typically say to control the device.\n"
+                    "Do NOT include markdown, explanations, bullet points, numbers, quotes, or punctuation.\n"
+                    "Return the nicknames ONLY as a single comma-separated list on a single line.\n\n"
+                    "Entity ID: {entity_id}\n"
+                    "Friendly Name: {friendly_name}\n"
+                    "Aliases:"
+                )
+                
+            if not base_url or not model:
+                return self.json({"error": "AI settings are incomplete. Please configure base URL and Model in Settings."}, status=400)
+                
+            session = async_get_clientsession(hass)
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+                
+            results = {}
+            for ent in entities_to_gen:
+                ent_id = ent.get("entity_id")
+                friendly = ent.get("display_name") or ent.get("name") or ent_id.split(".")[-1]
+                
+                # Render prompt
+                prompt = prompt_template.format(entity_id=ent_id, friendly_name=friendly)
+                
+                payload = {
+                    "model": model,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.2,
+                    "max_tokens": 100
+                }
+                
+                async with session.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=15) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        content = data["choices"][0]["message"]["content"].strip()
+                        # Clean content
+                        aliases = [a.strip().strip('"').strip("'") for a in content.split(",") if a.strip()]
+                        results[ent_id] = aliases
+                    else:
+                        text = await resp.text()
+                        _LOGGER.error("LLM nickname request failed (HTTP %s): %s", resp.status, text)
+                        
+            return self.json({"results": results})
+        except Exception as err:
+            _LOGGER.exception("Failed to generate nicknames")
+            return self.json({"error": str(err)}, status=500)
+
+
+class AISuggestExposureView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/ai/suggest_exposure"
+    name = "api:google_assistant_entity_console:ai:suggest_exposure"
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+            entity_list = body.get("entities", [])
+            user_intent = body.get("user_intent", "")
+            
+            if not entity_list:
+                return self.json({"error": "No entities provided"}, status=400)
+            if not user_intent:
+                return self.json({"error": "No user intent/criteria provided"}, status=400)
+                
+            settings = load_ai_settings(hass)
+            base_url = settings.get("base_url", "").rstrip("/")
+            api_key = settings.get("api_key", "")
+            model = settings.get("model", "")
+            prompt_template = settings.get("exposure_prompt", "").strip()
+            
+            # Default fallback template
+            if not prompt_template:
+                prompt_template = (
+                    "You are an assistant helping configure which smart home entities to expose to Google Assistant.\n"
+                    "Given a list of entities with their IDs, names, and domains, and the user's intent: '{user_intent}'.\n"
+                    "Determine which entities from the list should be exposed.\n"
+                    "Return ONLY a JSON list of entity IDs that should be exposed. Do not wrap in markdown codeblocks (e.g. ```json). Just return the raw JSON list.\n\n"
+                    "Entities:\n"
+                    "{entities_list}"
+                )
+                
+            if not base_url or not model:
+                return self.json({"error": "AI settings are incomplete. Please configure base URL and Model in Settings."}, status=400)
+                
+            session = async_get_clientsession(hass)
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+                
+            # Serialize entities briefly for the prompt context
+            serialized_ents = []
+            for ent in entity_list:
+                serialized_ents.append({
+                    "entity_id": ent.get("entity_id"),
+                    "name": ent.get("display_name") or ent.get("name"),
+                    "domain": ent.get("domain")
+                })
+                
+            entities_str = json.dumps(serialized_ents, indent=2)
+            prompt = prompt_template.format(user_intent=user_intent, entities_list=entities_str)
+            
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.1,
+                "max_tokens": 1000
+            }
+            
+            async with session.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=25) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    content = data["choices"][0]["message"]["content"].strip()
+                    
+                    # Clean markdown formatting if returned
+                    if content.startswith("```"):
+                        content = re.sub(r"^```[a-zA-Z]*\n?", "", content)
+                        content = re.sub(r"\n?```$", "", content)
+                    content = content.strip()
+                    
+                    try:
+                        exposed_ids = json.loads(content)
+                        if isinstance(exposed_ids, list):
+                            return self.json({"exposed_ids": exposed_ids})
+                    except Exception as parse_err:
+                        _LOGGER.error("Failed to parse LLM JSON exposure suggestions: %s (Raw: %s)", parse_err, content)
+                        return self.json({"error": f"LLM returned invalid format: {content}"}, status=502)
+                else:
+                    text = await resp.text()
+                    return self.json({"error": f"LLM exposure request failed (HTTP {resp.status}): {text}"}, status=resp.status)
+                    
+            return self.json({"error": "No response from LLM"}, status=502)
+        except Exception as err:
+            _LOGGER.exception("Failed to suggest exposure")
+            return self.json({"error": str(err)}, status=500)

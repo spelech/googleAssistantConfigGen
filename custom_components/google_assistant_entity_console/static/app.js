@@ -474,6 +474,9 @@ function renderTable() {
                             <i class="fa-solid ${getEntityIcon(domain)}" style="margin-right: 0.25rem;"></i> ${getDomainName(domain)}
                         </div>
                         <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                            <button class="header-action-link" onclick="openAiAssist('domain', '${domain.replace(/'/g, "\\'")}', event)" title="AI Assist for this Domain" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Assist
+                            </button>
                             <button class="header-action-link" onclick="toggleSubGroups('domain', '${domain.replace(/'/g, "\\'")}', true, event)" title="Collapse all floors under this domain" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
                                 <i class="fa-solid fa-angles-up"></i> Collapse Floors
                             </button>
@@ -550,8 +553,17 @@ function renderTable() {
                     
                     roomTr.innerHTML = `
                         <td colspan="4" class="room-header-cell" style="padding-left: 3rem !important; font-size: 0.85rem;">
-                            <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                            <i class="fa-solid fa-door-open"></i> ${room}
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <div>
+                                    <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                                    <i class="fa-solid fa-door-open"></i> ${room}
+                                </div>
+                                <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                                    <button class="header-action-link" onclick="openAiAssist('room', '${domain.replace(/'/g, "\\'")}:${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', event)" title="AI Assist for this Room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Assist
+                                    </button>
+                                </div>
+                            </div>
                         </td>
                     `;
                     entityTableBody.appendChild(roomTr);
@@ -612,7 +624,10 @@ function renderTable() {
                             <i class="fa-solid ${floorChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
                             <i class="fa-solid fa-layer-group"></i> Floor: ${floor}
                         </div>
-                        <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                         <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                            <button class="header-action-link" onclick="openAiAssist('floor', '${floor.replace(/'/g, "\\'")}', event)" title="AI Assist for this Floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Assist
+                            </button>
                             <button class="header-action-link" onclick="toggleSubGroups('floor', '${floor.replace(/'/g, "\\'")}', true, event)" title="Collapse all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
                                 <i class="fa-solid fa-angles-up"></i> Collapse Rooms
                             </button>
@@ -657,6 +672,9 @@ function renderTable() {
                                 <i class="fa-solid fa-door-open"></i> ${room}
                             </div>
                             <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                                <button class="header-action-link" onclick="openAiAssist('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', event)" title="AI Assist for this Room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> AI Assist
+                                </button>
                                 <button class="header-action-link" onclick="toggleSubGroups('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', true, event)" title="Collapse all domains under this room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
                                     <i class="fa-solid fa-angles-up"></i> Collapse Domains
                                 </button>
@@ -690,8 +708,17 @@ function renderTable() {
                     
                     domainTr.innerHTML = `
                         <td colspan="4" class="domain-header-cell" style="padding-left: 2rem !important; font-size: 0.85rem; font-weight: 600; color: var(--outline);">
-                            <i class="fa-solid ${domainChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                            <i class="fa-solid ${getEntityIcon(domain)}" style="margin-right: 0.25rem;"></i> ${getDomainName(domain)}
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <div>
+                                    <i class="fa-solid ${domainChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                                    <i class="fa-solid ${getEntityIcon(domain)}" style="margin-right: 0.25rem;"></i> ${getDomainName(domain)}
+                                </div>
+                                <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
+                                    <button class="header-action-link" onclick="openAiAssist('domain', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}:${domain.replace(/'/g, "\\'")}', event)" title="AI Assist for this Domain" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Assist
+                                    </button>
+                                </div>
+                            </div>
                         </td>
                     `;
                     entityTableBody.appendChild(domainTr);
@@ -1260,7 +1287,397 @@ window.addToBlocklistDirectly = async function(entityId, event) {
         entities = entities.filter(e => e.entity_id !== entityId);
         updateStats();
         applyFilters();
+        showToast(`${entityId} blocked and hidden`, 'success');
+        
+        // Remove locally from the array to immediately update UI
+        entities = entities.filter(e => e.entity_id !== entityId);
+        updateStats();
+        applyFilters();
     } catch (error) {
         showToast('Error blocking entity: ' + error.message, 'error');
     }
 };
+
+// AI Features: Settings, Modal, and Assistant Logic
+let aiSettings = {};
+
+async function loadAiSettings() {
+    try {
+        const response = await fetch('/api/google_assistant_entity_console/ai/settings', {
+            headers: getAuthHeaders()
+        });
+        if (response.ok) {
+            const data = await response.json();
+            aiSettings = data.settings || {};
+            
+            // Populate fields
+            const baseUrlEl = document.getElementById('aiBaseUrl');
+            const apiKeyEl = document.getElementById('aiApiKey');
+            const nicknameEl = document.getElementById('nicknamePrompt');
+            const exposureEl = document.getElementById('exposurePrompt');
+            const modelEl = document.getElementById('aiModel');
+            
+            if (baseUrlEl) baseUrlEl.value = aiSettings.base_url || '';
+            if (apiKeyEl) apiKeyEl.value = aiSettings.api_key || '';
+            if (nicknameEl) nicknameEl.value = aiSettings.nickname_prompt || '';
+            if (exposureEl) exposureEl.value = aiSettings.exposure_prompt || '';
+            
+            if (modelEl && aiSettings.model) {
+                modelEl.innerHTML = `<option value="${aiSettings.model}">${aiSettings.model}</option>`;
+                modelEl.value = aiSettings.model;
+            }
+        }
+    } catch (e) {
+        console.error("Failed to load AI settings", e);
+    }
+}
+
+// Bind AI Events
+document.addEventListener('DOMContentLoaded', () => {
+    loadAiSettings();
+    
+    const openAiSettingsBtn = document.getElementById('openAiSettingsBtn');
+    const aiSettingsModal = document.getElementById('aiSettingsModal');
+    const closeAiSettingsModal = document.getElementById('closeAiSettingsModal');
+    const closeAiSettingsModalBtn = document.getElementById('closeAiSettingsModalBtn');
+    const saveAiSettingsBtn = document.getElementById('saveAiSettingsBtn');
+    const queryModelsBtn = document.getElementById('queryModelsBtn');
+    
+    if (openAiSettingsBtn && aiSettingsModal) {
+        openAiSettingsBtn.addEventListener('click', () => {
+            aiSettingsModal.style.display = 'block';
+        });
+    }
+    
+    const closeSettings = () => {
+        if (aiSettingsModal) aiSettingsModal.style.display = 'none';
+    };
+    if (closeAiSettingsModal) closeAiSettingsModal.addEventListener('click', closeSettings);
+    if (closeAiSettingsModalBtn) closeAiSettingsModalBtn.addEventListener('click', closeSettings);
+    
+    if (queryModelsBtn) {
+        queryModelsBtn.addEventListener('click', async () => {
+            const baseUrl = document.getElementById('aiBaseUrl').value.trim();
+            const apiKey = document.getElementById('aiApiKey').value.trim();
+            if (!baseUrl) {
+                showToast('Please enter a Base URL first', 'error');
+                return;
+            }
+            queryModelsBtn.disabled = true;
+            queryModelsBtn.textContent = 'Fetching...';
+            try {
+                const response = await fetch('/api/google_assistant_entity_console/ai/models', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({ base_url: baseUrl, api_key: apiKey })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Failed to fetch models');
+                }
+                const data = await response.json();
+                const modelSelect = document.getElementById('aiModel');
+                if (modelSelect) {
+                    modelSelect.innerHTML = '<option value="">Select a model...</option>';
+                    data.models.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        opt.textContent = m;
+                        modelSelect.appendChild(opt);
+                    });
+                    if (aiSettings.model && data.models.includes(aiSettings.model)) {
+                        modelSelect.value = aiSettings.model;
+                    }
+                    showToast('Models fetched successfully!', 'success');
+                }
+            } catch (error) {
+                showToast('Error querying models: ' + error.message, 'error');
+            } finally {
+                queryModelsBtn.disabled = false;
+                queryModelsBtn.textContent = 'Fetch Models';
+            }
+        });
+    }
+    
+    if (saveAiSettingsBtn) {
+        saveAiSettingsBtn.addEventListener('click', async () => {
+            const baseUrl = document.getElementById('aiBaseUrl').value.trim();
+            const apiKey = document.getElementById('aiApiKey').value.trim();
+            const model = document.getElementById('aiModel').value.trim();
+            const nicknamePrompt = document.getElementById('nicknamePrompt').value;
+            const exposurePrompt = document.getElementById('exposurePrompt').value;
+            
+            saveAiSettingsBtn.disabled = true;
+            saveAiSettingsBtn.textContent = 'Saving...';
+            try {
+                const response = await fetch('/api/google_assistant_entity_console/ai/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({
+                        settings: {
+                            base_url: baseUrl,
+                            api_key: apiKey,
+                            model: model,
+                            nickname_prompt: nicknamePrompt,
+                            exposure_prompt: exposurePrompt
+                        }
+                    })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Failed to save settings');
+                }
+                aiSettings = { base_url: baseUrl, api_key: apiKey, model: model, nickname_prompt: nicknamePrompt, exposure_prompt: exposurePrompt };
+                showToast('AI Settings saved successfully', 'success');
+                closeSettings();
+            } catch (error) {
+                showToast('Error saving settings: ' + error.message, 'error');
+            } finally {
+                saveAiSettingsBtn.disabled = false;
+                saveAiSettingsBtn.textContent = 'Save Settings';
+            }
+        });
+    }
+    
+    // AI Assist Dialog controls
+    const aiAssistModal = document.getElementById('aiAssistModal');
+    const closeAiAssistModal = document.getElementById('closeAiAssistModal');
+    const closeAiAssistModalBtn = document.getElementById('closeAiAssistModalBtn');
+    
+    const closeAssist = () => {
+        if (aiAssistModal) aiAssistModal.style.display = 'none';
+    };
+    if (closeAiAssistModal) closeAiAssistModal.addEventListener('click', closeAssist);
+    if (closeAiAssistModalBtn) closeAiAssistModalBtn.addEventListener('click', closeAssist);
+    
+    // AI Nicknames button click handler
+    const aiGenNicknamesBtn = document.getElementById('aiGenNicknamesBtn');
+    if (aiGenNicknamesBtn) {
+        aiGenNicknamesBtn.addEventListener('click', async () => {
+            const targetType = document.getElementById('aiAssistTargetType').value;
+            const targetId = document.getElementById('aiAssistTargetId').value;
+            const ents = getEntitiesInGroup(targetType, targetId);
+            
+            if (ents.length === 0) {
+                showToast('No entities in this group to generate nicknames for.', 'error');
+                return;
+            }
+            
+            aiGenNicknamesBtn.disabled = true;
+            const oldText = aiGenNicknamesBtn.innerHTML;
+            aiGenNicknamesBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Generating...';
+            
+            try {
+                const response = await fetch('/api/google_assistant_entity_console/ai/generate_nicknames', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({ entities: ents })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Request failed');
+                }
+                const data = await response.json();
+                const results = data.results || {};
+                
+                // Save nicknames to HA registry concurrently
+                const promises = [];
+                for (const [entityId, aliases] of Object.entries(results)) {
+                    if (aliases && aliases.length > 0) {
+                        promises.push(setAliasesDirectly(entityId, aliases));
+                    }
+                }
+                await Promise.all(promises);
+                
+                showToast(`AI successfully generated nicknames for ${promises.length} entities!`, 'success');
+                closeAssist();
+                applyFilters();
+            } catch (error) {
+                showToast('AI Nickname generation failed: ' + error.message, 'error');
+            } finally {
+                aiGenNicknamesBtn.disabled = false;
+                aiGenNicknamesBtn.innerHTML = oldText;
+            }
+        });
+    }
+    
+    // AI Suggest Exposure button click handler
+    const aiSuggestExposureBtn = document.getElementById('aiSuggestExposureBtn');
+    if (aiSuggestExposureBtn) {
+        aiSuggestExposureBtn.addEventListener('click', async () => {
+            const targetType = document.getElementById('aiAssistTargetType').value;
+            const targetId = document.getElementById('aiAssistTargetId').value;
+            const intent = document.getElementById('aiExposureIntent').value.trim();
+            
+            if (!intent) {
+                showToast('Please enter your criteria intent (e.g. Expose only switches)', 'error');
+                return;
+            }
+            
+            const ents = getEntitiesInGroup(targetType, targetId);
+            if (ents.length === 0) {
+                showToast('No entities in this group to analyze.', 'error');
+                return;
+            }
+            
+            aiSuggestExposureBtn.disabled = true;
+            const oldText = aiSuggestExposureBtn.innerHTML;
+            aiSuggestExposureBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Analyzing...';
+            
+            try {
+                const response = await fetch('/api/google_assistant_entity_console/ai/suggest_exposure', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({ entities: ents, user_intent: intent })
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Request failed');
+                }
+                const data = await response.json();
+                const exposedIds = data.exposed_ids || [];
+                
+                // Update exposure states concurrently
+                const promises = [];
+                for (const e of ents) {
+                    const newExposeStatus = exposedIds.includes(e.entity_id);
+                    if (e.should_expose !== newExposeStatus) {
+                        promises.push(setExposureDirectly(e.entity_id, newExposeStatus));
+                    }
+                }
+                await Promise.all(promises);
+                
+                showToast(`AI evaluated exposure successfully! Exposing ${exposedIds.length} entities.`, 'success');
+                closeAssist();
+                updateStats();
+                applyFilters();
+            } catch (error) {
+                showToast('AI Smart exposure analysis failed: ' + error.message, 'error');
+            } finally {
+                aiSuggestExposureBtn.disabled = false;
+                aiSuggestExposureBtn.innerHTML = oldText;
+            }
+        });
+    }
+});
+
+// AI Assist Pop Up Launcher
+window.openAiAssist = function(targetType, targetId, event) {
+    if (event) event.stopPropagation();
+    
+    const modal = document.getElementById('aiAssistModal');
+    const targetTypeEl = document.getElementById('aiAssistTargetType');
+    const targetIdEl = document.getElementById('aiAssistTargetId');
+    const targetDisplayEl = document.getElementById('aiAssistTargetDisplay');
+    
+    if (modal && targetTypeEl && targetIdEl && targetDisplayEl) {
+        targetTypeEl.value = targetType;
+        targetIdEl.value = targetId;
+        
+        let label = '';
+        if (targetType === 'floor') {
+            label = `Floor: ${targetId}`;
+        } else if (targetType === 'room') {
+            const parts = targetId.split(':');
+            label = `Room: ${parts[parts.length - 1]} (${parts[0]})`;
+        } else {
+            const parts = targetId.split(':');
+            label = `Domain: ${getDomainName(parts[parts.length - 1])}`;
+        }
+        
+        targetDisplayEl.textContent = `Applying AI Assist to: ${label}`;
+        
+        // Clear old intent
+        const intentEl = document.getElementById('aiExposureIntent');
+        if (intentEl) intentEl.value = '';
+        
+        modal.style.display = 'block';
+    }
+};
+
+// Help gather entities in a specific group floor/room/domain
+function getEntitiesInGroup(targetType, targetId) {
+    if (targetType === 'floor') {
+        return entities.filter(e => e.floor === targetId);
+    } else if (targetType === 'room') {
+        // targetId format: 'floor:room' or 'domain:floor:room'
+        const parts = targetId.split(':');
+        const roomName = parts[parts.length - 1];
+        const floorName = parts[parts.length - 2];
+        return entities.filter(e => e.floor === floorName && e.area === roomName);
+    } else {
+        // domain targetId format: 'domainName' or 'floor:room:domainName'
+        const parts = targetId.split(':');
+        const domainName = parts[parts.length - 1];
+        if (parts.length > 1) {
+            const roomName = parts[parts.length - 2];
+            const floorName = parts[parts.length - 3];
+            return entities.filter(e => e.domain === domainName && e.floor === floorName && e.area === roomName);
+        }
+        return entities.filter(e => e.domain === domainName);
+    }
+}
+
+// Helpers for Direct updates
+async function setExposureDirectly(entityId, newExposeStatus) {
+    try {
+        const response = await fetch('/api/google_assistant_entity_console/entities/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+                entity_id: entityId,
+                should_expose: newExposeStatus
+            })
+        });
+        if (response.ok) {
+            const entity = entities.find(e => e.entity_id === entityId);
+            if (entity) entity.should_expose = newExposeStatus;
+            return true;
+        }
+    } catch (e) {
+        console.error("Failed to update exposure for " + entityId, e);
+    }
+    return false;
+}
+
+async function setAliasesDirectly(entityId, aliases) {
+    try {
+        const entity = entities.find(e => e.entity_id === entityId);
+        if (!entity) return false;
+        const response = await fetch('/api/google_assistant_entity_console/entities/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+                entity_id: entityId,
+                name: entity.name,
+                aliases: aliases,
+                should_expose: entity.should_expose
+            })
+        });
+        if (response.ok) {
+            entity.aliases = aliases;
+            return true;
+        }
+    } catch (e) {
+        console.error("Failed to update aliases for " + entityId, e);
+    }
+    return false;
+}
