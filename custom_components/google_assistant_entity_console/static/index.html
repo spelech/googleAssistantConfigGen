@@ -222,17 +222,17 @@
                 </div>
                 <div class="form-group">
                     <label for="nicknamePrompt">Bulk Nickname Generation Prompt Override</label>
-                    <textarea id="nicknamePrompt" class="form-input" style="height: 80px; font-family: monospace; font-size: 0.85rem;" placeholder="Default prompt: You are an assistant helping configure Google Assistant aliases..."></textarea>
+                    <textarea id="nicknamePrompt" class="form-input" style="height: 120px; font-family: monospace; font-size: 0.8rem;" placeholder="You are an assistant helping configure Google Assistant aliases for smart home entities.&#10;For the following entity, generate 2-4 clean, natural-language nicknames (aliases) that a user would typically say to control the device.&#10;Do NOT include markdown, explanations, bullet points, numbers, quotes, or punctuation.&#10;Return the nicknames ONLY as a single comma-separated list on a single line.&#10;&#10;Entity ID: {entity_id}&#10;Friendly Name: {friendly_name}&#10;Aliases:"></textarea>
                     <small style="color: var(--on-surface-variant);">Supported variables: <code>{entity_id}</code>, <code>{friendly_name}</code></small>
                 </div>
                 <div class="form-group">
                     <label for="singleNicknamePrompt">Single Entity Nickname Generation Prompt Override (Room-Aware)</label>
-                    <textarea id="singleNicknamePrompt" class="form-input" style="height: 80px; font-family: monospace; font-size: 0.85rem;" placeholder="Default prompt: You are an assistant helping configure Google Assistant aliases for a specific smart home entity..."></textarea>
+                    <textarea id="singleNicknamePrompt" class="form-input" style="height: 120px; font-family: monospace; font-size: 0.8rem;" placeholder="You are an assistant helping configure Google Assistant aliases for a specific smart home entity.&#10;For the target entity, generate 2-4 clean, natural-language nicknames (aliases) that a user would typically say to control the device.&#10;Avoid markdown, explanations, bullet points, numbers, quotes, or punctuation.&#10;Use the context of other entities in the same room to avoid duplicate, confusing, or conflicting names.&#10;Return the nicknames ONLY as a single comma-separated list on a single line.&#10;&#10;Target Entity ID: {entity_id}&#10;Target Friendly Name: {friendly_name}&#10;Other Entities in same room: {room_context}&#10;Aliases:"></textarea>
                     <small style="color: var(--on-surface-variant);">Supported variables: <code>{entity_id}</code>, <code>{friendly_name}</code>, <code>{room_context}</code></small>
                 </div>
                 <div class="form-group">
                     <label for="exposurePrompt">Entity Exposure Suggestion Prompt Override</label>
-                    <textarea id="exposurePrompt" class="form-input" style="height: 80px; font-family: monospace; font-size: 0.85rem;" placeholder="Default prompt: You are an assistant helping configure which smart home entities to expose..."></textarea>
+                    <textarea id="exposurePrompt" class="form-input" style="height: 120px; font-family: monospace; font-size: 0.8rem;" placeholder="You are an assistant helping configure which smart home entities to expose to Google Assistant.&#10;Given a list of entities with their IDs, names, and domains, and the user's intent: '{user_intent}'.&#10;Determine which entities from the list should be exposed.&#10;Return ONLY a JSON list of entity IDs that should be exposed. Do not wrap in markdown codeblocks (e.g. ```json). Just return the raw JSON list.&#10;&#10;Entities:&#10;{entities_list}"></textarea>
                     <small style="color: var(--on-surface-variant);">Supported variables: <code>{user_intent}</code>, <code>{entities_list}</code></small>
                 </div>
             </div>
