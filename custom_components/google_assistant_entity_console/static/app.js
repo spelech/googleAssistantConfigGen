@@ -785,6 +785,9 @@ function renderEntityRow(e) {
                 <button class="inline-add-alias-btn" onclick="openQuickAliasModal('${e.entity_id}', event)" title="Add nickname">
                     <i class="fa-solid fa-plus"></i>
                 </button>
+                <button class="inline-add-alias-btn ai-suggest-single-btn" onclick="generateSingleEntityNickname('${e.entity_id}', event)" title="AI Suggest Nicknames (Room-Aware)" style="color: var(--primary); margin-left: 0.25rem;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </button>
             </div>
         </td>
         <td style="text-align: center;">${exposeBadge}</td>
@@ -1314,12 +1317,14 @@ async function loadAiSettings() {
             const baseUrlEl = document.getElementById('aiBaseUrl');
             const apiKeyEl = document.getElementById('aiApiKey');
             const nicknameEl = document.getElementById('nicknamePrompt');
+            const singleNicknameEl = document.getElementById('singleNicknamePrompt');
             const exposureEl = document.getElementById('exposurePrompt');
             const modelEl = document.getElementById('aiModel');
             
             if (baseUrlEl) baseUrlEl.value = aiSettings.base_url || '';
             if (apiKeyEl) apiKeyEl.value = aiSettings.api_key || '';
             if (nicknameEl) nicknameEl.value = aiSettings.nickname_prompt || '';
+            if (singleNicknameEl) singleNicknameEl.value = aiSettings.single_nickname_prompt || '';
             if (exposureEl) exposureEl.value = aiSettings.exposure_prompt || '';
             
             if (modelEl && aiSettings.model) {
@@ -1384,11 +1389,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     modelSelect.innerHTML = '<option value="">Select a model...</option>';
                     data.models.forEach(m => {
                         const opt = document.createElement('option');
-                        opt.value = m;
-                        opt.textContent = m;
+                        opt.value = m.id;
+                        
+                        // Parse pricing details if they exist (formatted per 1M tokens)
+                        let pricingText = '';
+                        if (m.pricing && m.pricing.prompt !== undefined) {
+                            const promptM = (parseFloat(m.pricing.prompt) * 1000000).toFixed(2);
+                            const completionM = (parseFloat(m.pricing.completion) * 1000000).toFixed(2);
+                            pricingText = ` ($${promptM}/M in, $${completionM}/M out)`;
+                        }
+                        
+                        opt.textContent = `${m.name}${pricingText}`;
                         modelSelect.appendChild(opt);
                     });
-                    if (aiSettings.model && data.models.includes(aiSettings.model)) {
+                    if (aiSettings.model) {
                         modelSelect.value = aiSettings.model;
                     }
                     showToast('Models fetched successfully!', 'success');
@@ -1408,6 +1422,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const apiKey = document.getElementById('aiApiKey').value.trim();
             const model = document.getElementById('aiModel').value.trim();
             const nicknamePrompt = document.getElementById('nicknamePrompt').value;
+            const singleNicknamePrompt = document.getElementById('singleNicknamePrompt').value;
             const exposurePrompt = document.getElementById('exposurePrompt').value;
             
             saveAiSettingsBtn.disabled = true;
@@ -1425,6 +1440,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             api_key: apiKey,
                             model: model,
                             nickname_prompt: nicknamePrompt,
+                            single_nickname_prompt: singleNicknamePrompt,
                             exposure_prompt: exposurePrompt
                         }
                     })
@@ -1433,7 +1449,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const err = await response.json();
                     throw new Error(err.error || 'Failed to save settings');
                 }
-                aiSettings = { base_url: baseUrl, api_key: apiKey, model: model, nickname_prompt: nicknamePrompt, exposure_prompt: exposurePrompt };
+                aiSettings = {
+                    base_url: baseUrl,
+                    api_key: apiKey,
+                    model: model,
+                    nickname_prompt: nicknamePrompt,
+                    single_nickname_prompt: singleNicknamePrompt,
+                    exposure_prompt: exposurePrompt
+                };
                 showToast('AI Settings saved successfully', 'success');
                 closeSettings();
             } catch (error) {
@@ -1681,3 +1704,54 @@ async function setAliasesDirectly(entityId, aliases) {
     }
     return false;
 }
+
+window.generateSingleEntityNickname = async function(entityId, event) {
+    if (event) event.stopPropagation();
+    const entity = entities.find(e => e.entity_id === entityId);
+    if (!entity) return;
+    
+    // Find all other entities in the same room/area context
+    const roomEntities = entities.filter(e => e.area === entity.area);
+    
+    // Show loading toast
+    showToast(`AI suggesting nicknames for ${entity.display_name}...`, 'info');
+    
+    try {
+        const response = await fetch('/api/google_assistant_entity_console/ai/generate_single_nickname', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+                entity_id: entityId,
+                display_name: entity.display_name,
+                room_entities: roomEntities
+            })
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to suggest nickname');
+        }
+        
+        const data = await response.json();
+        const aliases = data.aliases || [];
+        
+        if (aliases.length === 0) {
+            showToast('AI returned no nickname suggestions.', 'error');
+            return;
+        }
+        
+        // Update aliases directly in registry
+        const success = await setAliasesDirectly(entityId, aliases);
+        if (success) {
+            showToast(`AI suggested nicknames added for ${entity.display_name}`, 'success');
+            applyFilters();
+        } else {
+            showToast('Failed to save AI suggested nicknames.', 'error');
+        }
+    } catch (error) {
+        showToast('AI suggestions failed: ' + error.message, 'error');
+    }
+};

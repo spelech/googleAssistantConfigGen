@@ -770,6 +770,17 @@ tr:hover td {
     transform: scale(1.05);
 }
 
+.ai-suggest-single-btn {
+    border-style: solid;
+    color: var(--primary);
+}
+
+.ai-suggest-single-btn:hover {
+    background-color: var(--primary-container);
+    color: var(--on-primary-container);
+    border-color: var(--primary);
+}
+
 .inline-alias-input-container {
     display: flex;
     align-items: center;

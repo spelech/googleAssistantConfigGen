@@ -587,16 +587,30 @@ class AIModelsView(HomeAssistantView):
                 
                 data = await resp.json()
                 models = []
+                
+                def parse_item(item):
+                    if not isinstance(item, dict) or "id" not in item:
+                        return None
+                    return {
+                        "id": item["id"],
+                        "name": item.get("name") or item["id"],
+                        "pricing": item.get("pricing") or {}
+                    }
+
                 if isinstance(data, dict) and "data" in data:
                     for item in data["data"]:
-                        if isinstance(item, dict) and "id" in item:
-                            models.append(item["id"])
+                        parsed = parse_item(item)
+                        if parsed:
+                            models.append(parsed)
                 elif isinstance(data, list):
                     for item in data:
-                        if isinstance(item, dict) and "id" in item:
-                            models.append(item["id"])
-                            
-                return self.json({"models": sorted(models)})
+                        parsed = parse_item(item)
+                        if parsed:
+                            models.append(parsed)
+                
+                # Sort models by name
+                models.sort(key=lambda m: m["name"].lower())
+                return self.json({"models": models})
         except Exception as err:
             _LOGGER.exception("Failed to query models")
             return self.json({"error": str(err)}, status=500)
@@ -761,4 +775,83 @@ class AISuggestExposureView(HomeAssistantView):
             return self.json({"error": "No response from LLM"}, status=502)
         except Exception as err:
             _LOGGER.exception("Failed to suggest exposure")
+            return self.json({"error": str(err)}, status=500)
+
+
+class AIGenerateSingleEntityNicknameView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/ai/generate_single_nickname"
+    name = "api:google_assistant_entity_console:ai:generate_single_nickname"
+
+    async def post(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            body = await request.json()
+            entity_id = body.get("entity_id")
+            display_name = body.get("display_name")
+            room_entities = body.get("room_entities", [])
+            
+            if not entity_id:
+                return self.json({"error": "Missing entity_id"}, status=400)
+                
+            settings = load_ai_settings(hass)
+            base_url = settings.get("base_url", "").rstrip("/")
+            api_key = settings.get("api_key", "")
+            model = settings.get("model", "")
+            prompt_template = settings.get("single_nickname_prompt", "").strip()
+            
+            # Default fallback template
+            if not prompt_template:
+                prompt_template = (
+                    "You are an assistant helping configure Google Assistant aliases for a specific smart home entity.\n"
+                    "For the target entity, generate 2-4 clean, natural-language nicknames (aliases) that a user would typically say to control the device.\n"
+                    "Avoid markdown, explanations, bullet points, numbers, quotes, or punctuation.\n"
+                    "Use the context of other entities in the same room to avoid duplicate, confusing, or conflicting names.\n"
+                    "Return the nicknames ONLY as a single comma-separated list on a single line.\n\n"
+                    "Target Entity ID: {entity_id}\n"
+                    "Target Friendly Name: {friendly_name}\n"
+                    "Other Entities in same room: {room_context}\n"
+                    "Aliases:"
+                )
+                
+            if not base_url or not model:
+                return self.json({"error": "AI settings are incomplete. Please configure base URL and Model in Settings."}, status=400)
+                
+            session = async_get_clientsession(hass)
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+                
+            # Serialize room context briefly
+            context_list = []
+            for e in room_entities:
+                if e.get("entity_id") != entity_id:
+                    context_list.append(f"{e.get('entity_id')} ({e.get('display_name') or e.get('name')})")
+            room_context_str = ", ".join(context_list) if context_list else "None"
+            
+            prompt = prompt_template.format(
+                entity_id=entity_id,
+                friendly_name=display_name or entity_id.split(".")[-1],
+                room_context=room_context_str
+            )
+            
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.2,
+                "max_tokens": 100
+            }
+            
+            async with session.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=15) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    content = data["choices"][0]["message"]["content"].strip()
+                    aliases = [a.strip().strip('"').strip("'") for a in content.split(",") if a.strip()]
+                    return self.json({"aliases": aliases})
+                else:
+                    text = await resp.text()
+                    return self.json({"error": f"LLM request failed (HTTP {resp.status}): {text}"}, status=resp.status)
+        except Exception as err:
+            _LOGGER.exception("Failed to generate single nickname")
             return self.json({"error": str(err)}, status=500)

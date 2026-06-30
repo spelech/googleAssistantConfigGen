@@ -218,9 +218,14 @@
                     <button type="button" id="queryModelsBtn" class="btn btn-secondary" style="height: 38px; border-radius: 6px;">Fetch Models</button>
                 </div>
                 <div class="form-group">
-                    <label for="nicknamePrompt">Nickname Generation Prompt Override</label>
+                    <label for="nicknamePrompt">Bulk Nickname Generation Prompt Override</label>
                     <textarea id="nicknamePrompt" class="form-input" style="height: 80px; font-family: monospace; font-size: 0.85rem;" placeholder="Default prompt: You are an assistant helping configure Google Assistant aliases..."></textarea>
                     <small style="color: var(--on-surface-variant);">Supported variables: <code>{entity_id}</code>, <code>{friendly_name}</code></small>
+                </div>
+                <div class="form-group">
+                    <label for="singleNicknamePrompt">Single Entity Nickname Generation Prompt Override (Room-Aware)</label>
+                    <textarea id="singleNicknamePrompt" class="form-input" style="height: 80px; font-family: monospace; font-size: 0.85rem;" placeholder="Default prompt: You are an assistant helping configure Google Assistant aliases for a specific smart home entity..."></textarea>
+                    <small style="color: var(--on-surface-variant);">Supported variables: <code>{entity_id}</code>, <code>{friendly_name}</code>, <code>{room_context}</code></small>
                 </div>
                 <div class="form-group">
                     <label for="exposurePrompt">Entity Exposure Suggestion Prompt Override</label>
