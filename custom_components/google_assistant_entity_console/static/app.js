@@ -1352,6 +1352,7 @@ function setupAiEventListeners() {
     if (openAiSettingsBtn && aiSettingsModal) {
         openAiSettingsBtn.addEventListener('click', () => {
             aiSettingsModal.style.display = 'block';
+            switchSettingsTab('connection');
         });
     }
     
@@ -1813,4 +1814,32 @@ window.generateSingleEntityNickname = async function(entityId, event) {
     } catch (error) {
         showToast('AI suggestions failed: ' + error.message, 'error');
     }
+};
+
+window.switchSettingsTab = function(tabName, event) {
+    if (event) event.preventDefault();
+    const tabs = ['connection', 'prompts'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`btn-tab-${t}`);
+        const panel = document.getElementById(`tab-panel-${t}`);
+        if (t === tabName) {
+            if (btn) {
+                btn.classList.add('active');
+                btn.style.borderBottomColor = 'var(--primary)';
+                btn.style.color = 'var(--primary)';
+            }
+            if (panel) {
+                panel.style.display = 'flex';
+            }
+        } else {
+            if (btn) {
+                btn.classList.remove('active');
+                btn.style.borderBottomColor = 'transparent';
+                btn.style.color = 'var(--on-surface-variant)';
+            }
+            if (panel) {
+                panel.style.display = 'none';
+            }
+        }
+    });
 };
