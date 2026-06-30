@@ -1534,8 +1534,12 @@ function setupAiEventListeners() {
         });
     }
     
-    // AI Suggest Exposure button click handler
+    // AI Suggest Exposure button click handler (now renders a review checklist first)
     const aiSuggestExposureBtn = document.getElementById('aiSuggestExposureBtn');
+    const aiExposureResultsContainer = document.getElementById('aiExposureResultsContainer');
+    const aiExposureResultsList = document.getElementById('aiExposureResultsList');
+    const aiApplyExposureBtn = document.getElementById('aiApplyExposureBtn');
+    
     if (aiSuggestExposureBtn) {
         aiSuggestExposureBtn.addEventListener('click', async () => {
             const targetType = document.getElementById('aiAssistTargetType').value;
@@ -1552,6 +1556,10 @@ function setupAiEventListeners() {
                 showToast('No entities in this group to analyze.', 'error');
                 return;
             }
+            
+            // Clear old results
+            if (aiExposureResultsContainer) aiExposureResultsContainer.style.display = 'none';
+            if (aiExposureResultsList) aiExposureResultsList.innerHTML = '';
             
             aiSuggestExposureBtn.disabled = true;
             const oldText = aiSuggestExposureBtn.innerHTML;
@@ -1573,25 +1581,71 @@ function setupAiEventListeners() {
                 const data = await response.json();
                 const exposedIds = data.exposed_ids || [];
                 
-                // Update exposure states concurrently
-                const promises = [];
-                for (const e of ents) {
-                    const newExposeStatus = exposedIds.includes(e.entity_id);
-                    if (e.should_expose !== newExposeStatus) {
-                        promises.push(setExposureDirectly(e.entity_id, newExposeStatus));
-                    }
-                }
-                await Promise.all(promises);
+                // Filter ents to find the ones suggested
+                const suggestedEnts = ents.filter(e => exposedIds.includes(e.entity_id));
                 
-                showToast(`AI evaluated exposure successfully! Exposing ${exposedIds.length} entities.`, 'success');
-                closeAssist();
-                updateStats();
-                applyFilters();
+                if (suggestedEnts.length === 0) {
+                    showToast('AI did not suggest exposing any new entities matching this criteria.', 'info');
+                    return;
+                }
+                
+                // Render checklist
+                suggestedEnts.forEach(e => {
+                    const div = document.createElement('div');
+                    div.style.display = 'flex';
+                    div.style.alignItems = 'center';
+                    div.style.gap = '0.5rem';
+                    div.style.padding = '0.2rem 0';
+                    div.innerHTML = `
+                        <input type="checkbox" id="aiExposeCheck_${e.entity_id.replace(/\./g, '_')}" value="${e.entity_id}" checked style="cursor: pointer; width: 15px; height: 15px;">
+                        <label for="aiExposeCheck_${e.entity_id.replace(/\./g, '_')}" style="cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; gap: 0.35rem; color: var(--on-surface);">
+                            <i class="fa-solid ${getEntityIcon(e.domain)}" style="color: var(--primary); font-size: 0.8rem; width: 12px; text-align: center;"></i>
+                            <span style="font-weight: 500;">${e.display_name}</span>
+                            <span style="color: var(--on-surface-variant); font-size: 0.7rem; font-family: monospace;">(${e.entity_id})</span>
+                        </label>
+                    `;
+                    aiExposureResultsList.appendChild(div);
+                });
+                
+                if (aiExposureResultsContainer) aiExposureResultsContainer.style.display = 'flex';
+                showToast(`AI generated suggestions for ${suggestedEnts.length} entities. Check list below.`, 'success');
             } catch (error) {
                 showToast('AI Smart exposure analysis failed: ' + error.message, 'error');
             } finally {
                 aiSuggestExposureBtn.disabled = false;
                 aiSuggestExposureBtn.innerHTML = oldText;
+            }
+        });
+    }
+    
+    if (aiApplyExposureBtn) {
+        aiApplyExposureBtn.addEventListener('click', async () => {
+            const checkboxes = aiExposureResultsList.querySelectorAll('input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) {
+                showToast('No entities selected to expose.', 'error');
+                return;
+            }
+            
+            aiApplyExposureBtn.disabled = true;
+            const oldBtnText = aiApplyExposureBtn.innerHTML;
+            aiApplyExposureBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 0.5rem;"></i> Exposing...';
+            
+            const promises = [];
+            checkboxes.forEach(cb => {
+                promises.push(setExposureDirectly(cb.value, true));
+            });
+            
+            try {
+                await Promise.all(promises);
+                showToast(`Successfully exposed ${promises.length} entities!`, 'success');
+                closeAssist();
+                updateStats();
+                applyFilters();
+            } catch (error) {
+                showToast('Error applying AI exposure: ' + error.message, 'error');
+            } finally {
+                aiApplyExposureBtn.disabled = false;
+                aiApplyExposureBtn.innerHTML = oldBtnText;
             }
         });
     }
@@ -1623,9 +1677,13 @@ window.openAiAssist = function(targetType, targetId, event) {
         
         targetDisplayEl.textContent = `Applying AI Assist to: ${label}`;
         
-        // Clear old intent
+        // Clear old intent and results
         const intentEl = document.getElementById('aiExposureIntent');
         if (intentEl) intentEl.value = '';
+        const resultsContainer = document.getElementById('aiExposureResultsContainer');
+        if (resultsContainer) resultsContainer.style.display = 'none';
+        const resultsList = document.getElementById('aiExposureResultsList');
+        if (resultsList) resultsList.innerHTML = '';
         
         modal.style.display = 'block';
     }
