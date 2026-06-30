@@ -821,12 +821,14 @@ class AIGenerateSingleEntityNicknameView(HomeAssistantView):
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
                 
-            # Serialize room context briefly
+            # Serialize room context with names and current nicknames/aliases
             context_list = []
             for e in room_entities:
                 if e.get("entity_id") != entity_id:
-                    context_list.append(f"{e.get('entity_id')} ({e.get('display_name') or e.get('name')})")
-            room_context_str = ", ".join(context_list) if context_list else "None"
+                    aliases_list = e.get("aliases", [])
+                    aliases_str = f", current nicknames: {aliases_list}" if aliases_list else ""
+                    context_list.append(f"{e.get('entity_id')} (name: {e.get('display_name') or e.get('name') or ''}{aliases_str})")
+            room_context_str = "; ".join(context_list) if context_list else "None"
             
             prompt = prompt_template.format(
                 entity_id=entity_id,
