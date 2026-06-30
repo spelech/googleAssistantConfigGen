@@ -170,6 +170,7 @@ function setupEventListeners() {
             }
         });
     }
+    setupAiEventListeners();
 }
 
 function updateStats() {
@@ -1338,7 +1339,7 @@ async function loadAiSettings() {
 }
 
 // Bind AI Events
-document.addEventListener('DOMContentLoaded', () => {
+function setupAiEventListeners() {
     loadAiSettings();
     
     const openAiSettingsBtn = document.getElementById('openAiSettingsBtn');
@@ -1594,7 +1595,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-});
+}
 
 // AI Assist Pop Up Launcher
 window.openAiAssist = function(targetType, targetId, event) {
