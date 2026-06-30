@@ -9,9 +9,15 @@ const collapsedGroups = new Set();
 const totalEntitiesEl = document.getElementById('totalEntities');
 const exposedEntitiesEl = document.getElementById('exposedEntities');
 const searchInput = document.getElementById('searchInput');
-const domainFilter = document.getElementById('domainFilter');
 const roomFilter = document.getElementById('roomFilter');
 const exposedOnlyCheckbox = document.getElementById('exposedOnlyCheckbox');
+
+// Advanced Filters DOM & State
+const toggleAdvancedFiltersBtn = document.getElementById('toggleAdvancedFiltersBtn');
+const advancedFiltersDrawer = document.getElementById('advancedFiltersDrawer');
+const hideGroupedLightsCheckbox = document.getElementById('hideGroupedLightsCheckbox');
+const domainChipsContainer = document.getElementById('domainChipsContainer');
+const selectedDomains = new Set();
 const entityTableBody = document.getElementById('entityTableBody');
 const rebuildBtn = document.getElementById('rebuildBtn');
 const groupingType = document.getElementById('groupingType');
@@ -89,6 +95,12 @@ async function fetchEntities() {
         const uniqueRooms = [...new Set(entities.map(e => e.area))].filter(r => r && r !== "TBA").sort();
         populateRoomFilter(uniqueRooms);
         
+        // Extract unique domains and initialize selected domains set
+        const uniqueDomains = [...new Set(entities.map(e => e.domain))].sort();
+        selectedDomains.clear();
+        uniqueDomains.forEach(d => selectedDomains.add(d));
+        renderDomainChips(uniqueDomains);
+        
         updateStats();
         applyFilters();
     } catch (error) {
@@ -103,10 +115,21 @@ async function fetchEntities() {
 // Event listeners setup
 function setupEventListeners() {
     if (searchInput) searchInput.addEventListener('input', applyFilters);
-    if (domainFilter) domainFilter.addEventListener('change', applyFilters);
     if (roomFilter) roomFilter.addEventListener('change', applyFilters);
     if (exposedOnlyCheckbox) exposedOnlyCheckbox.addEventListener('change', applyFilters);
     if (groupingType) groupingType.addEventListener('change', applyFilters);
+    
+    // Advanced Filters Event Listeners
+    if (toggleAdvancedFiltersBtn && advancedFiltersDrawer) {
+        toggleAdvancedFiltersBtn.addEventListener('click', () => {
+            const isHidden = advancedFiltersDrawer.style.display === 'none';
+            advancedFiltersDrawer.style.display = isHidden ? 'flex' : 'none';
+            toggleAdvancedFiltersBtn.classList.toggle('active', isHidden);
+        });
+    }
+    if (hideGroupedLightsCheckbox) {
+        hideGroupedLightsCheckbox.addEventListener('change', applyFilters);
+    }
     
     // Rebuild Button
     if (rebuildBtn) rebuildBtn.addEventListener('click', handleRebuild);
@@ -165,6 +188,31 @@ function populateRoomFilter(uniqueRooms) {
     });
 }
 
+function renderDomainChips(uniqueDomains) {
+    if (!domainChipsContainer) return;
+    domainChipsContainer.innerHTML = '';
+    
+    uniqueDomains.forEach(domain => {
+        const chip = document.createElement('div');
+        chip.className = `domain-chip ${selectedDomains.has(domain) ? 'active' : ''}`;
+        chip.innerHTML = `
+            <i class="fa-solid ${getEntityIcon(domain)}"></i>
+            <span>${getDomainName(domain)}</span>
+        `;
+        chip.addEventListener('click', () => {
+            if (selectedDomains.has(domain)) {
+                selectedDomains.delete(domain);
+                chip.classList.remove('active');
+            } else {
+                selectedDomains.add(domain);
+                chip.classList.add('active');
+            }
+            applyFilters();
+        });
+        domainChipsContainer.appendChild(chip);
+    });
+}
+
 function showTableLoading() {
     entityTableBody.innerHTML = `
         <tr>
@@ -178,10 +226,10 @@ function showTableLoading() {
 
 // Filter and render table
 function applyFilters() {
-    const query = searchInput.value.toLowerCase().trim();
-    const domain = domainFilter.value;
-    const room = roomFilter.value;
-    const exposedOnly = exposedOnlyCheckbox.checked;
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const room = roomFilter ? roomFilter.value : 'all';
+    const exposedOnly = exposedOnlyCheckbox ? exposedOnlyCheckbox.checked : false;
+    const hideGroupedLights = hideGroupedLightsCheckbox ? hideGroupedLightsCheckbox.checked : false;
     
     filteredEntities = entities.filter(e => {
         // Query match
@@ -190,8 +238,8 @@ function applyFilters() {
             (e.display_name || '').toLowerCase().includes(query) || 
             (e.aliases || []).some(a => a && typeof a === 'string' && a.toLowerCase().includes(query));
             
-        // Domain match
-        const matchesDomain = domain === 'all' || e.domain === domain;
+        // Domain match (Multi-select)
+        const matchesDomain = selectedDomains.size === 0 || selectedDomains.has(e.domain);
         
         // Room match
         const matchesRoom = room === 'all' || (e.area || '').toLowerCase() === room;
@@ -199,7 +247,10 @@ function applyFilters() {
         // Exposed match (either marked in registry or currently exposed in YAML)
         const matchesExposed = !exposedOnly || e.should_expose || e.yaml_exposed;
         
-        return matchesQuery && matchesDomain && matchesRoom && matchesExposed;
+        // Hide Grouped Lights match
+        const matchesGroupedLights = !hideGroupedLights || e.domain !== 'light' || !e.in_group;
+        
+        return matchesQuery && matchesDomain && matchesRoom && matchesExposed && matchesGroupedLights;
     });
     
     renderTable();

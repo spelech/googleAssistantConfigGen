@@ -118,6 +118,22 @@ async def async_fetch_entities_data(hass: HomeAssistant):
     area_reg = area_registry.async_get(hass)
     floor_reg = floor_registry.async_get(hass)
 
+    # Identify all light group members in Home Assistant
+    light_group_members = set()
+    for state in hass.states.async_all("light"):
+        if state.attributes and "entity_ids" in state.attributes:
+            members = state.attributes.get("entity_ids")
+            if isinstance(members, list):
+                for m in members:
+                    light_group_members.add(m)
+    for state in hass.states.async_all("group"):
+        if state.attributes and "entity_ids" in state.attributes:
+            members = state.attributes.get("entity_ids")
+            if isinstance(members, list):
+                for m in members:
+                    if m.startswith("light."):
+                        light_group_members.add(m)
+
     # Build area name and floor mapping
     area_map = {}
     area_floor_map = {}
@@ -228,6 +244,7 @@ async def async_fetch_entities_data(hass: HomeAssistant):
 
         platform = entry.platform or ""
         device_class = entry.device_class or ""
+        in_group = entity_id in light_group_members
 
         active_entities.append({
             "entity_id": entity_id,
@@ -241,7 +258,8 @@ async def async_fetch_entities_data(hass: HomeAssistant):
             "area": area_name,
             "floor": floor_name,
             "domain": domain,
-            "aliases": clean_aliases
+            "aliases": clean_aliases,
+            "in_group": in_group
         })
 
     return active_entities

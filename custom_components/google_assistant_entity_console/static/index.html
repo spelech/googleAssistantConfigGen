@@ -83,16 +83,6 @@
                 <input type="text" id="searchInput" placeholder="Search by name, ID or nickname...">
             </div>
             <div class="filters">
-                <select id="domainFilter" class="filter-select">
-                    <option value="all">All Domains</option>
-                    <option value="light">Lights</option>
-                    <option value="switch">Switches</option>
-                    <option value="media_player">Media Players</option>
-                    <option value="fan">Fans</option>
-                    <option value="sensor">Sensors</option>
-                    <option value="binary_sensor">Binary Sensors</option>
-                    <option value="cover">Covers</option>
-                </select>
                 <select id="roomFilter" class="filter-select">
                     <option value="all">All Rooms</option>
                 </select>
@@ -106,6 +96,28 @@
                         <span class="slider"></span>
                     </label>
                     <span class="toggle-label">Exposed Only</span>
+                </div>
+                <button id="toggleAdvancedFiltersBtn" class="btn btn-secondary" style="padding: 0.5rem 1rem; border-radius: 12px; font-size: 0.85rem; height: 38px;">
+                    <i class="fa-solid fa-sliders"></i> Advanced Filters
+                </button>
+            </div>
+            
+            <!-- Collapsible Advanced Filters Drawer -->
+            <div id="advancedFiltersDrawer" style="display: none; width: 100%; border-top: 1px solid var(--border); margin-top: 1rem; padding-top: 1rem; flex-direction: column; gap: 1rem;">
+                <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center;">
+                    <div class="toggle-container">
+                        <label class="switch-toggle">
+                            <input type="checkbox" id="hideGroupedLightsCheckbox">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="toggle-label">Hide Grouped Lights (in defined Light Groups)</span>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
+                    <span style="font-size: 0.8rem; font-weight: 500; color: var(--on-surface-variant);">Include Domains / Types</span>
+                    <div id="domainChipsContainer" style="display: flex; flex-wrap: wrap; gap: 0.5rem; width: 100%;">
+                        <!-- Rendered dynamically as active/inactive chips -->
+                    </div>
                 </div>
             </div>
         </section>
