@@ -1315,13 +1315,19 @@ async function loadAiSettings() {
             aiSettings = data.settings || {};
             
             // Populate fields
+            const aiSourceEl = document.getElementById('aiSource');
             const baseUrlEl = document.getElementById('aiBaseUrl');
             const apiKeyEl = document.getElementById('aiApiKey');
             const nicknameEl = document.getElementById('nicknamePrompt');
             const singleNicknameEl = document.getElementById('singleNicknamePrompt');
             const exposureEl = document.getElementById('exposurePrompt');
             const modelEl = document.getElementById('aiModel');
+            const haAgentIdEl = document.getElementById('haAgentId');
             
+            if (aiSourceEl) {
+                aiSourceEl.value = aiSettings.ai_source || 'openai';
+                updateConnectionFieldsDisplay(aiSourceEl.value);
+            }
             if (baseUrlEl) baseUrlEl.value = aiSettings.base_url || '';
             if (apiKeyEl) apiKeyEl.value = aiSettings.api_key || '';
             if (nicknameEl) nicknameEl.value = aiSettings.nickname_prompt || '';
@@ -1332,9 +1338,26 @@ async function loadAiSettings() {
                 modelEl.innerHTML = `<option value="${aiSettings.model}">${aiSettings.model}</option>`;
                 modelEl.value = aiSettings.model;
             }
+            
+            if (haAgentIdEl && aiSettings.ha_agent_id) {
+                haAgentIdEl.innerHTML = `<option value="${aiSettings.ha_agent_id}">${aiSettings.ha_agent_id}</option>`;
+                haAgentIdEl.value = aiSettings.ha_agent_id;
+            }
         }
     } catch (e) {
         console.error("Failed to load AI settings", e);
+    }
+}
+
+function updateConnectionFieldsDisplay(source) {
+    const openaiFields = document.getElementById('connection-openai-fields');
+    const haFields = document.getElementById('connection-ha-fields');
+    if (source === 'home_assistant') {
+        if (openaiFields) openaiFields.style.display = 'none';
+        if (haFields) haFields.style.display = 'flex';
+    } else {
+        if (openaiFields) openaiFields.style.display = 'flex';
+        if (haFields) haFields.style.display = 'none';
     }
 }
 
@@ -1420,9 +1443,11 @@ function setupAiEventListeners() {
     
     if (saveAiSettingsBtn) {
         saveAiSettingsBtn.addEventListener('click', async () => {
+            const aiSource = document.getElementById('aiSource').value;
             const baseUrl = document.getElementById('aiBaseUrl').value.trim();
             const apiKey = document.getElementById('aiApiKey').value.trim();
             const model = document.getElementById('aiModel').value.trim();
+            const haAgentId = document.getElementById('haAgentId').value.trim();
             const nicknamePrompt = document.getElementById('nicknamePrompt').value;
             const singleNicknamePrompt = document.getElementById('singleNicknamePrompt').value;
             const exposurePrompt = document.getElementById('exposurePrompt').value;
@@ -1438,9 +1463,11 @@ function setupAiEventListeners() {
                     },
                     body: JSON.stringify({
                         settings: {
+                            ai_source: aiSource,
                             base_url: baseUrl,
                             api_key: apiKey,
                             model: model,
+                            ha_agent_id: haAgentId,
                             nickname_prompt: nicknamePrompt,
                             single_nickname_prompt: singleNicknamePrompt,
                             exposure_prompt: exposurePrompt
@@ -1452,9 +1479,11 @@ function setupAiEventListeners() {
                     throw new Error(err.error || 'Failed to save settings');
                 }
                 aiSettings = {
+                    ai_source: aiSource,
                     base_url: baseUrl,
                     api_key: apiKey,
                     model: model,
+                    ha_agent_id: haAgentId,
                     nickname_prompt: nicknamePrompt,
                     single_nickname_prompt: singleNicknamePrompt,
                     exposure_prompt: exposurePrompt
@@ -1466,6 +1495,52 @@ function setupAiEventListeners() {
             } finally {
                 saveAiSettingsBtn.disabled = false;
                 saveAiSettingsBtn.textContent = 'Save Settings';
+            }
+        });
+    }
+
+    // Toggle fields based on selected source
+    const aiSource = document.getElementById('aiSource');
+    if (aiSource) {
+        aiSource.addEventListener('change', (e) => {
+            updateConnectionFieldsDisplay(e.target.value);
+        });
+    }
+
+    // Fetch HA Agents
+    const queryHaAgentsBtn = document.getElementById('queryHaAgentsBtn');
+    if (queryHaAgentsBtn) {
+        queryHaAgentsBtn.addEventListener('click', async () => {
+            queryHaAgentsBtn.disabled = true;
+            queryHaAgentsBtn.textContent = 'Fetching...';
+            try {
+                const response = await fetch('/api/google_assistant_entity_console/ai/ha_agents', {
+                    headers: getAuthHeaders()
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Failed to fetch agents');
+                }
+                const data = await response.json();
+                const haAgentSelect = document.getElementById('haAgentId');
+                if (haAgentSelect) {
+                    haAgentSelect.innerHTML = '<option value="">Select an agent...</option>';
+                    data.agents.forEach(agent => {
+                        const opt = document.createElement('option');
+                        opt.value = agent.id;
+                        opt.textContent = agent.name;
+                        haAgentSelect.appendChild(opt);
+                    });
+                    if (aiSettings.ha_agent_id) {
+                        haAgentSelect.value = aiSettings.ha_agent_id;
+                    }
+                    showToast('Home Assistant Agents fetched successfully!', 'success');
+                }
+            } catch (error) {
+                showToast('Error querying HA Agents: ' + error.message, 'error');
+            } finally {
+                queryHaAgentsBtn.disabled = false;
+                queryHaAgentsBtn.textContent = 'Fetch Agents';
             }
         });
     }

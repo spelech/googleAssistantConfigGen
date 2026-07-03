@@ -19,6 +19,7 @@ from .views import (
     BlocklistAddView,
     AISettingsView,
     AIModelsView,
+    AIHaAgentsView,
     AIGenerateNicknamesView,
     AISuggestExposureView,
     AIGenerateSingleEntityNicknameView,
@@ -62,6 +63,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.http.register_view(BlocklistAddView())
     hass.http.register_view(AISettingsView())
     hass.http.register_view(AIModelsView())
+    hass.http.register_view(AIHaAgentsView())
     hass.http.register_view(AIGenerateNicknamesView())
     hass.http.register_view(AISuggestExposureView())
     hass.http.register_view(AIGenerateSingleEntityNicknameView())

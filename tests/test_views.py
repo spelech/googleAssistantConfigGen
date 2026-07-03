@@ -115,3 +115,44 @@ async def test_ai_generate_single_nickname(mock_hass):
         assert "aliases" in data
         assert "cooking light" in data["aliases"]
         assert "kitchen main" in data["aliases"]
+
+
+@pytest.mark.anyio
+async def test_ai_ha_agents_view(mock_hass):
+    from custom_components.google_assistant_entity_console.views import AIHaAgentsView
+    view = AIHaAgentsView()
+    request = AsyncMock()
+    request.app = {"hass": mock_hass}
+    
+    mock_agent = MagicMock()
+    mock_agent.id = "conversation.openai"
+    mock_agent.name = "OpenAI Agent"
+    
+    with patch("custom_components.google_assistant_entity_console.views.async_get_agent_info", return_value=[mock_agent]):
+        resp = await view.get(request)
+        data = json.loads(resp.body.decode())
+        assert "agents" in data
+        assert len(data["agents"]) == 1
+        assert data["agents"][0]["id"] == "conversation.openai"
+        assert data["agents"][0]["name"] == "OpenAI Agent"
+
+
+@pytest.mark.anyio
+async def test_async_call_llm_home_assistant(mock_hass):
+    from custom_components.google_assistant_entity_console.views import async_call_llm
+    
+    test_settings = {
+        "ai_source": "home_assistant",
+        "ha_agent_id": "conversation.openai"
+    }
+    
+    mock_result = MagicMock()
+    mock_result.response.response_type = "action_done"
+    mock_result.response.as_dict.return_value = {
+        "speech": {"plain": {"speech": "cooking light, kitchen main"}}
+    }
+    
+    with patch("custom_components.google_assistant_entity_console.views.async_converse", return_value=mock_result) as mock_converse:
+        response_text = await async_call_llm(mock_hass, "Test prompt", test_settings)
+        assert response_text == "cooking light, kitchen main"
+        mock_converse.assert_called_once()

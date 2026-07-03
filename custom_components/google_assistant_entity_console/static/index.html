@@ -217,21 +217,45 @@
                 <!-- Tab Panel 1: Connection -->
                 <div id="tab-panel-connection" class="tab-panel-content" style="display: flex; flex-direction: column; gap: 1rem;">
                     <div class="form-group">
-                        <label for="aiBaseUrl">API Base URL</label>
-                        <input type="text" id="aiBaseUrl" placeholder="e.g. https://api.openai.com/v1 or https://openrouter.ai/api/v1" class="form-input">
+                        <label for="aiSource">AI Integration Source</label>
+                        <select id="aiSource" class="form-input">
+                            <option value="openai">OpenAI Compatible API (e.g. OpenRouter, LiteLLM, OpenAI)</option>
+                            <option value="home_assistant">Home Assistant Built-in Conversation Agent (LLM)</option>
+                        </select>
                     </div>
-                    <div class="form-group">
-                        <label for="aiApiKey">API Key</label>
-                        <input type="password" id="aiApiKey" placeholder="sk-..." class="form-input">
-                    </div>
-                    <div class="form-group" style="display: flex; gap: 0.5rem; align-items: flex-end;">
-                        <div style="flex-grow: 1;">
-                            <label for="aiModel">Model Name</label>
-                            <select id="aiModel" class="form-input">
-                                <option value="">Select a model...</option>
-                            </select>
+
+                    <!-- OpenAI Style Fields -->
+                    <div id="connection-openai-fields" style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div class="form-group">
+                            <label for="aiBaseUrl">API Base URL</label>
+                            <input type="text" id="aiBaseUrl" placeholder="e.g. https://api.openai.com/v1 or https://openrouter.ai/api/v1" class="form-input">
                         </div>
-                        <button type="button" id="queryModelsBtn" class="btn btn-secondary" style="height: 38px; border-radius: 6px;">Fetch Models</button>
+                        <div class="form-group">
+                            <label for="aiApiKey">API Key</label>
+                            <input type="password" id="aiApiKey" placeholder="sk-..." class="form-input">
+                        </div>
+                        <div class="form-group" style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                            <div style="flex-grow: 1;">
+                                <label for="aiModel">Model Name</label>
+                                <select id="aiModel" class="form-input">
+                                    <option value="">Select a model...</option>
+                                </select>
+                            </div>
+                            <button type="button" id="queryModelsBtn" class="btn btn-secondary" style="height: 38px; border-radius: 6px;">Fetch Models</button>
+                        </div>
+                    </div>
+
+                    <!-- Home Assistant Native Fields -->
+                    <div id="connection-ha-fields" style="display: none; flex-direction: column; gap: 1rem;">
+                        <div class="form-group" style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                            <div style="flex-grow: 1;">
+                                <label for="haAgentId">Home Assistant Agent</label>
+                                <select id="haAgentId" class="form-input">
+                                    <option value="">Select an agent...</option>
+                                </select>
+                            </div>
+                            <button type="button" id="queryHaAgentsBtn" class="btn btn-secondary" style="height: 38px; border-radius: 6px;">Fetch Agents</button>
+                        </div>
                     </div>
                 </div>
                 

@@ -534,6 +534,84 @@ def save_ai_settings(hass: HomeAssistant, settings: dict):
 
 # AI API Views
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.components.conversation import async_converse, async_get_agent_info
+from homeassistant.core import Context
+
+async def async_call_llm(hass: HomeAssistant, prompt: str, settings: dict) -> str:
+    ai_source = settings.get("ai_source", "openai")
+    
+    if ai_source == "home_assistant":
+        ha_agent_id = settings.get("ha_agent_id")
+        if not ha_agent_id:
+            raise ValueError("Home Assistant conversation agent is not selected. Please configure it in Settings.")
+            
+        result = await async_converse(
+            hass=hass,
+            text=prompt,
+            conversation_id=None,
+            context=Context(),
+            agent_id=ha_agent_id
+        )
+        
+        # Check if error response
+        if result.response.response_type == "error":
+            raise RuntimeError(f"HA Conversation Agent error: {result.response.as_dict().get('speech', {}).get('plain', {}).get('speech', 'Unknown error')}")
+            
+        response_text = result.response.as_dict().get("speech", {}).get("plain", {}).get("speech", "")
+        if not response_text:
+            raise RuntimeError("HA Conversation Agent returned an empty response.")
+        return response_text.strip()
+        
+    else: # openai compatible api
+        base_url = settings.get("base_url", "").rstrip("/")
+        api_key = settings.get("api_key", "")
+        model = settings.get("model", "")
+        
+        if not base_url or not model:
+            raise ValueError("AI settings are incomplete. Please configure base URL and Model in Settings.")
+            
+        session = async_get_clientsession(hass)
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 1000
+        }
+        
+        async with session.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=25) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                content = data["choices"][0]["message"]["content"].strip()
+                return content
+            else:
+                err_text = await resp.text()
+                raise RuntimeError(f"API Error ({resp.status}): {err_text}")
+
+
+class AIHaAgentsView(HomeAssistantView):
+    url = "/api/google_assistant_entity_console/ai/ha_agents"
+    name = "api:google_assistant_entity_console:ai:ha_agents"
+
+    async def get(self, request: web.Request) -> web.Response:
+        hass = request.app["hass"]
+        try:
+            agents = async_get_agent_info(hass)
+            serialized_agents = []
+            for agent in agents:
+                serialized_agents.append({
+                    "id": agent.id,
+                    "name": agent.name
+                })
+            return self.json({"agents": serialized_agents})
+        except Exception as err:
+            return self.json({"error": str(err)}, status_code=500)
+
 
 class AISettingsView(HomeAssistantView):
     url = "/api/google_assistant_entity_console/ai/settings"
@@ -646,14 +724,6 @@ class AIGenerateNicknamesView(HomeAssistantView):
                     "Aliases:"
                 )
                 
-            if not base_url or not model:
-                return self.json({"error": "AI settings are incomplete. Please configure base URL and Model in Settings."}, status=400)
-                
-            session = async_get_clientsession(hass)
-            headers = {"Content-Type": "application/json"}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-                
             results = {}
             for ent in entities_to_gen:
                 ent_id = ent.get("entity_id")
@@ -661,26 +731,12 @@ class AIGenerateNicknamesView(HomeAssistantView):
                 
                 # Render prompt
                 prompt = prompt_template.format(entity_id=ent_id, friendly_name=friendly)
-                
-                payload = {
-                    "model": model,
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.2,
-                    "max_tokens": 100
-                }
-                
-                async with session.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=15) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        content = data["choices"][0]["message"]["content"].strip()
-                        # Clean content
-                        aliases = [a.strip().strip('"').strip("'") for a in content.split(",") if a.strip()]
-                        results[ent_id] = aliases
-                    else:
-                        text = await resp.text()
-                        _LOGGER.error("LLM nickname request failed (HTTP %s): %s", resp.status, text)
+                try:
+                    content = await async_call_llm(hass, prompt, settings)
+                    aliases = [a.strip().strip('"').strip("'") for a in content.split(",") if a.strip()]
+                    results[ent_id] = aliases
+                except Exception as err:
+                    _LOGGER.error("LLM nickname request failed for %s: %s", ent_id, err)
                         
             return self.json({"results": results})
         except Exception as err:
@@ -721,14 +777,6 @@ class AISuggestExposureView(HomeAssistantView):
                     "{entities_list}"
                 )
                 
-            if not base_url or not model:
-                return self.json({"error": "AI settings are incomplete. Please configure base URL and Model in Settings."}, status=400)
-                
-            session = async_get_clientsession(hass)
-            headers = {"Content-Type": "application/json"}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-                
             # Serialize entities briefly for the prompt context
             serialized_ents = []
             for ent in entity_list:
@@ -741,38 +789,21 @@ class AISuggestExposureView(HomeAssistantView):
             entities_str = json.dumps(serialized_ents, indent=2)
             prompt = prompt_template.format(user_intent=user_intent, entities_list=entities_str)
             
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.1,
-                "max_tokens": 1000
-            }
+            content = await async_call_llm(hass, prompt, settings)
             
-            async with session.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=25) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    content = data["choices"][0]["message"]["content"].strip()
-                    
-                    # Clean markdown formatting if returned
-                    if content.startswith("```"):
-                        content = re.sub(r"^```[a-zA-Z]*\n?", "", content)
-                        content = re.sub(r"\n?```$", "", content)
-                    content = content.strip()
-                    
-                    try:
-                        exposed_ids = json.loads(content)
-                        if isinstance(exposed_ids, list):
-                            return self.json({"exposed_ids": exposed_ids})
-                    except Exception as parse_err:
-                        _LOGGER.error("Failed to parse LLM JSON exposure suggestions: %s (Raw: %s)", parse_err, content)
-                        return self.json({"error": f"LLM returned invalid format: {content}"}, status=502)
-                else:
-                    text = await resp.text()
-                    return self.json({"error": f"LLM exposure request failed (HTTP {resp.status}): {text}"}, status=resp.status)
-                    
-            return self.json({"error": "No response from LLM"}, status=502)
+            # Clean markdown formatting if returned
+            if content.startswith("```"):
+                content = re.sub(r"^```[a-zA-Z]*\n?", "", content)
+                content = re.sub(r"\n?```$", "", content)
+            content = content.strip()
+            
+            try:
+                exposed_ids = json.loads(content)
+                if isinstance(exposed_ids, list):
+                    return self.json({"exposed_ids": exposed_ids})
+            except Exception as parse_err:
+                _LOGGER.error("Failed to parse LLM JSON exposure suggestions: %s (Raw: %s)", parse_err, content)
+                return self.json({"error": f"LLM returned invalid format: {content}"}, status=502)
         except Exception as err:
             _LOGGER.exception("Failed to suggest exposure")
             return self.json({"error": str(err)}, status=500)
@@ -813,14 +844,6 @@ class AIGenerateSingleEntityNicknameView(HomeAssistantView):
                     "Aliases:"
                 )
                 
-            if not base_url or not model:
-                return self.json({"error": "AI settings are incomplete. Please configure base URL and Model in Settings."}, status=400)
-                
-            session = async_get_clientsession(hass)
-            headers = {"Content-Type": "application/json"}
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-                
             # Serialize room context with names and current nicknames/aliases
             context_list = []
             for e in room_entities:
@@ -836,24 +859,9 @@ class AIGenerateSingleEntityNicknameView(HomeAssistantView):
                 room_context=room_context_str
             )
             
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.2,
-                "max_tokens": 100
-            }
-            
-            async with session.post(f"{base_url}/chat/completions", headers=headers, json=payload, timeout=15) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    content = data["choices"][0]["message"]["content"].strip()
-                    aliases = [a.strip().strip('"').strip("'") for a in content.split(",") if a.strip()]
-                    return self.json({"aliases": aliases})
-                else:
-                    text = await resp.text()
-                    return self.json({"error": f"LLM request failed (HTTP {resp.status}): {text}"}, status=resp.status)
+            content = await async_call_llm(hass, prompt, settings)
+            aliases = [a.strip().strip('"').strip("'") for a in content.split(",") if a.strip()]
+            return self.json({"aliases": aliases})
         except Exception as err:
             _LOGGER.exception("Failed to generate single nickname")
             return self.json({"error": str(err)}, status=500)
