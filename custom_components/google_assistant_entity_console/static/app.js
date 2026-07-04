@@ -755,6 +755,10 @@ function renderEntityRow(e) {
         </span>
     `).join(' ');
     
+    if (e.unavailable) {
+        tr.style.opacity = '0.75';
+    }
+    
     // Expose status badge (directly togglable on click)
     let exposeBadge = '';
     if (e.yaml_exposed && e.should_expose) {
@@ -771,8 +775,9 @@ function renderEntityRow(e) {
         <td>
             <div class="entity-info-wrapper">
                 <div class="entity-name-wrapper" style="display: inline-flex; align-items: center; gap: 0.4rem;">
-                    <i class="fa-solid ${getEntityIcon(e.domain)}" style="color: var(--primary); margin-right: 0.15rem; font-size: 0.95rem;"></i>
+                    <i class="fa-solid ${getEntityIcon(e.domain)}" style="color: ${e.unavailable ? 'var(--on-surface-variant)' : 'var(--primary)'}; margin-right: 0.15rem; font-size: 0.95rem;"></i>
                     <div class="entity-name"><strong>${e.display_name}</strong></div>
+                    ${e.unavailable ? '<span class="badge" style="background: rgba(220, 53, 69, 0.12); color: #e44c5a; font-size: 0.7rem; font-weight: 600; padding: 0.1rem 0.35rem; display: inline-flex; align-items: center; gap: 0.2rem; border-radius: 4px; border: 1px solid rgba(220, 53, 69, 0.25);" title="Entity is currently offline or unavailable in Home Assistant"><i class="fa-solid fa-circle-exclamation"></i>Unavailable</span>' : ''}
                     <button class="inline-edit-name-btn" onclick="openEditNameInline('${e.entity_id}', event)" title="Rename Entity" style="background: none; border: none; cursor: pointer; font-size: 0.75rem; padding: 0.2rem;">
                         <i class="fa-solid fa-pencil"></i>
                     </button>

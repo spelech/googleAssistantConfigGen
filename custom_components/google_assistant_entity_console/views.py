@@ -250,6 +250,10 @@ async def async_fetch_entities_data(hass: HomeAssistant):
         device_class = entry.device_class or ""
         in_group = entity_id in light_group_members
 
+        # Resolve state availability
+        state_obj = hass.states.get(entity_id)
+        is_unavailable = state_obj is None or state_obj.state in ("unavailable", "unknown")
+
         active_entities.append({
             "entity_id": entity_id,
             "name": entry.name,
@@ -263,7 +267,8 @@ async def async_fetch_entities_data(hass: HomeAssistant):
             "floor": floor_name,
             "domain": domain,
             "aliases": clean_aliases,
-            "in_group": in_group
+            "in_group": in_group,
+            "unavailable": is_unavailable
         })
 
     return active_entities
