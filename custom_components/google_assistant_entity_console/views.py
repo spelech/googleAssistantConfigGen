@@ -291,7 +291,7 @@ class EntitiesView(HomeAssistantView):
             })
         except Exception as err:
             _LOGGER.exception("Failed to fetch entities registry")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 class UpdateEntityView(HomeAssistantView):
@@ -337,7 +337,7 @@ class UpdateEntityView(HomeAssistantView):
             return self.json({"success": True})
         except Exception as err:
             _LOGGER.exception("Failed to update entity settings")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 class RebuildView(HomeAssistantView):
@@ -430,7 +430,7 @@ class RebuildView(HomeAssistantView):
             })
         except Exception as err:
             _LOGGER.exception("Failed to rebuild configs")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 class RestartView(HomeAssistantView):
@@ -444,7 +444,7 @@ class RestartView(HomeAssistantView):
             return self.json({"success": True})
         except Exception as err:
             _LOGGER.exception("Failed to trigger Home Assistant restart")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 class BlocklistView(HomeAssistantView):
@@ -458,7 +458,7 @@ class BlocklistView(HomeAssistantView):
             return self.json({"blocklist": blocklist})
         except Exception as err:
             _LOGGER.exception("Failed to get blocklist")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
     async def post(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
@@ -479,7 +479,7 @@ class BlocklistView(HomeAssistantView):
             return self.json({"success": True, "blocklist": blocklist})
         except Exception as err:
             _LOGGER.exception("Failed to update blocklist")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 class BlocklistAddView(HomeAssistantView):
@@ -507,7 +507,7 @@ class BlocklistAddView(HomeAssistantView):
             return self.json({"success": True, "blocklist": blocklist})
         except Exception as err:
             _LOGGER.exception("Failed to add to blocklist")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 # AI Settings Storage Helpers
@@ -624,7 +624,7 @@ class AISettingsView(HomeAssistantView):
             settings = load_ai_settings(hass)
             return self.json({"settings": settings})
         except Exception as err:
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
     async def post(self, request: web.Request) -> web.Response:
         hass = request.app["hass"]
@@ -637,7 +637,7 @@ class AISettingsView(HomeAssistantView):
             save_ai_settings(hass, settings)
             return self.json({"success": True, "settings": settings})
         except Exception as err:
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 class AIModelsView(HomeAssistantView):
@@ -662,7 +662,7 @@ class AIModelsView(HomeAssistantView):
             async with session.get(f"{base_url}/models", headers=headers, timeout=10) as resp:
                 if resp.status != 200:
                     text = await resp.text()
-                    return self.json({"error": f"Failed to fetch models (HTTP {resp.status}): {text}"}, status=resp.status)
+                    return self.json({"error": f"Failed to fetch models (HTTP {resp.status}): {text}"}, status_code=resp.status)
                 
                 data = await resp.json()
                 models = []
@@ -692,7 +692,7 @@ class AIModelsView(HomeAssistantView):
                 return self.json({"models": models})
         except Exception as err:
             _LOGGER.exception("Failed to query models")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 class AIGenerateNicknamesView(HomeAssistantView):
@@ -742,7 +742,7 @@ class AIGenerateNicknamesView(HomeAssistantView):
             return self.json({"results": results})
         except Exception as err:
             _LOGGER.exception("Failed to generate nicknames")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 class AISuggestExposureView(HomeAssistantView):
@@ -807,7 +807,7 @@ class AISuggestExposureView(HomeAssistantView):
                 return self.json({"error": f"LLM returned invalid format: {content}"}, status_code=502)
         except Exception as err:
             _LOGGER.exception("Failed to suggest exposure")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
 
 
 class AIGenerateSingleEntityNicknameView(HomeAssistantView):
@@ -865,4 +865,4 @@ class AIGenerateSingleEntityNicknameView(HomeAssistantView):
             return self.json({"aliases": aliases})
         except Exception as err:
             _LOGGER.exception("Failed to generate single nickname")
-            return self.json({"error": str(err)}, status=500)
+            return self.json({"error": str(err)}, status_code=500)
