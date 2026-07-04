@@ -221,14 +221,15 @@ async def async_fetch_entities_data(hass: HomeAssistant):
 
         # Resolve Display Name
         display_name = entry.name
-        if not display_name and device_id:
+        if (not display_name or not isinstance(display_name, str)) and device_id:
             display_name = device_name_map.get(device_id)
-        if not display_name:
+        if not display_name or not isinstance(display_name, str):
             display_name = entry.original_name
-        if not display_name:
+        if not display_name or not isinstance(display_name, str):
             # Fallback to formatting entity ID name part
             name_part = entity_id.split(".")[-1]
             display_name = name_part.replace("_", " ").title()
+        display_name = str(display_name)
 
         # Resolve should_expose
         should_expose = False
@@ -307,12 +308,12 @@ class UpdateEntityView(HomeAssistantView):
             should_expose = body.get("should_expose")
 
             if not entity_id:
-                return self.json({"error": "Missing entity_id"}, status=400)
+                return self.json({"error": "Missing entity_id"}, status_code=400)
 
             ent_reg = entity_registry.async_get(hass)
             entry = ent_reg.async_get(entity_id)
             if not entry:
-                return self.json({"error": f"Entity {entity_id} not found"}, status=404)
+                return self.json({"error": f"Entity {entity_id} not found"}, status_code=404)
 
             # Filter out any "0", 0, or empty values from aliases
             clean_aliases = None
@@ -398,7 +399,7 @@ class RebuildView(HomeAssistantView):
             try:
                 yaml.load(cleaned_yaml, Loader=CustomLoader)
             except Exception as val_err:
-                return self.json({"error": f"Generated YAML failed validation: {val_err}"}, status=500)
+                return self.json({"error": f"Generated YAML failed validation: {val_err}"}, status_code=500)
 
             # Write file
             with open(filepath, "w", encoding="utf-8") as f:
@@ -465,14 +466,14 @@ class BlocklistView(HomeAssistantView):
             body = await request.json()
             blocklist = body.get("blocklist")
             if not isinstance(blocklist, list):
-                return self.json({"error": "Blocklist must be a list"}, status=400)
+                return self.json({"error": "Blocklist must be a list"}, status_code=400)
             
             # Syntax validation for regexes
             for pattern in blocklist:
                 try:
                     re.compile(pattern)
                 except re.error as err:
-                    return self.json({"error": f"Invalid regex pattern '{pattern}': {err}"}, status=400)
+                    return self.json({"error": f"Invalid regex pattern '{pattern}': {err}"}, status_code=400)
 
             save_blocklist(hass, blocklist)
             return self.json({"success": True, "blocklist": blocklist})
@@ -491,12 +492,12 @@ class BlocklistAddView(HomeAssistantView):
             body = await request.json()
             pattern = body.get("pattern")
             if not pattern:
-                return self.json({"error": "Missing pattern"}, status=400)
+                return self.json({"error": "Missing pattern"}, status_code=400)
 
             try:
                 re.compile(pattern)
             except re.error as err:
-                return self.json({"error": f"Invalid regex pattern: {err}"}, status=400)
+                return self.json({"error": f"Invalid regex pattern: {err}"}, status_code=400)
 
             blocklist = load_blocklist(hass)
             if pattern not in blocklist:
@@ -631,7 +632,7 @@ class AISettingsView(HomeAssistantView):
             body = await request.json()
             settings = body.get("settings", {})
             if not isinstance(settings, dict):
-                return self.json({"error": "Settings must be a dictionary"}, status=400)
+                return self.json({"error": "Settings must be a dictionary"}, status_code=400)
             
             save_ai_settings(hass, settings)
             return self.json({"success": True, "settings": settings})
@@ -651,7 +652,7 @@ class AIModelsView(HomeAssistantView):
             api_key = body.get("api_key", "")
             
             if not base_url:
-                return self.json({"error": "Missing base URL"}, status=400)
+                return self.json({"error": "Missing base URL"}, status_code=400)
                 
             session = async_get_clientsession(hass)
             headers = {}
@@ -704,7 +705,7 @@ class AIGenerateNicknamesView(HomeAssistantView):
             body = await request.json()
             entities_to_gen = body.get("entities", [])
             if not entities_to_gen:
-                return self.json({"error": "No entities provided"}, status=400)
+                return self.json({"error": "No entities provided"}, status_code=400)
                 
             settings = load_ai_settings(hass)
             base_url = settings.get("base_url", "").rstrip("/")
@@ -756,9 +757,9 @@ class AISuggestExposureView(HomeAssistantView):
             user_intent = body.get("user_intent", "")
             
             if not entity_list:
-                return self.json({"error": "No entities provided"}, status=400)
+                return self.json({"error": "No entities provided"}, status_code=400)
             if not user_intent:
-                return self.json({"error": "No user intent/criteria provided"}, status=400)
+                return self.json({"error": "No user intent/criteria provided"}, status_code=400)
                 
             settings = load_ai_settings(hass)
             base_url = settings.get("base_url", "").rstrip("/")
@@ -803,7 +804,7 @@ class AISuggestExposureView(HomeAssistantView):
                     return self.json({"exposed_ids": exposed_ids})
             except Exception as parse_err:
                 _LOGGER.error("Failed to parse LLM JSON exposure suggestions: %s (Raw: %s)", parse_err, content)
-                return self.json({"error": f"LLM returned invalid format: {content}"}, status=502)
+                return self.json({"error": f"LLM returned invalid format: {content}"}, status_code=502)
         except Exception as err:
             _LOGGER.exception("Failed to suggest exposure")
             return self.json({"error": str(err)}, status=500)
@@ -822,7 +823,7 @@ class AIGenerateSingleEntityNicknameView(HomeAssistantView):
             room_entities = body.get("room_entities", [])
             
             if not entity_id:
-                return self.json({"error": "Missing entity_id"}, status=400)
+                return self.json({"error": "Missing entity_id"}, status_code=400)
                 
             settings = load_ai_settings(hass)
             base_url = settings.get("base_url", "").rstrip("/")
