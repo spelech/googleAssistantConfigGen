@@ -344,6 +344,10 @@ td {
     vertical-align: middle;
 }
 
+.entity-row td {
+    padding: 0.6rem 0.85rem;
+}
+
 tr:last-child td {
     border-bottom: none;
 }

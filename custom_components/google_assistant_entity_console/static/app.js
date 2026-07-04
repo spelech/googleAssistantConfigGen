@@ -435,22 +435,21 @@ function renderTable() {
     const isDomainGrouping = (groupingType && groupingType.value === 'domain');
     
     if (isDomainGrouping) {
-        // Group by Domain -> Floor -> Room
+        // Group by Domain -> Floor & Room
         const groups = {};
         filteredEntities.forEach(e => {
             const domain = e.domain || 'No Domain';
             const floor = e.floor || 'No Floor';
             const room = e.area || 'No Room';
+            const floorAndRoom = (floor !== 'No Floor' && floor !== 'TBA') ? `${floor} › ${room}` : room;
+            
             if (!groups[domain]) {
                 groups[domain] = {};
             }
-            if (!groups[domain][floor]) {
-                groups[domain][floor] = {};
+            if (!groups[domain][floorAndRoom]) {
+                groups[domain][floorAndRoom] = [];
             }
-            if (!groups[domain][floor][room]) {
-                groups[domain][floor][room] = [];
-            }
-            groups[domain][floor][room].push(e);
+            groups[domain][floorAndRoom].push(e);
         });
         
         const sortedDomains = Object.keys(groups).sort();
@@ -478,12 +477,6 @@ function renderTable() {
                             <button class="header-action-link" onclick="openAiAssist('domain', '${domain.replace(/'/g, "\\'")}', event)" title="AI Assist for this Domain" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i> AI Assist
                             </button>
-                            <button class="header-action-link" onclick="toggleSubGroups('domain', '${domain.replace(/'/g, "\\'")}', true, event)" title="Collapse all floors under this domain" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                <i class="fa-solid fa-angles-up"></i> Collapse Floors
-                            </button>
-                            <button class="header-action-link" onclick="toggleSubGroups('domain', '${domain.replace(/'/g, "\\'")}', false, event)" title="Expand all floors under this domain" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                <i class="fa-solid fa-angles-down"></i> Expand Floors
-                            </button>
                         </div>
                     </div>
                 </td>
@@ -492,111 +485,56 @@ function renderTable() {
             
             if (isDomainCollapsed) return;
             
-            const floorsInDomain = groups[domain];
-            const sortedFloors = Object.keys(floorsInDomain).sort((a, b) => {
-                if (a === 'No Floor' || a === 'TBA') return 1;
-                if (b === 'No Floor' || b === 'TBA') return -1;
-                return a.localeCompare(b);
-            });
+            const roomsInDomain = groups[domain];
+            const sortedRooms = Object.keys(roomsInDomain).sort();
             
-            sortedFloors.forEach(floor => {
-                const floorKey = `floor:${domain}:${floor}`;
-                const isFloorCollapsed = collapsedGroups.has(floorKey);
+            sortedRooms.forEach(room => {
+                const roomKey = `room:${domain}:${room}`;
+                const isRoomCollapsed = collapsedGroups.has(roomKey);
                 
-                // Floor Header under Domain
-                const floorTr = document.createElement('tr');
-                floorTr.className = 'floor-header-row';
-                floorTr.style.cursor = 'pointer';
-                floorTr.setAttribute('onclick', `toggleGroup('${floorKey}', event)`);
+                // Room Subheader (Floor › Room)
+                const roomTr = document.createElement('tr');
+                roomTr.className = 'room-header-row';
+                roomTr.style.cursor = 'pointer';
+                roomTr.setAttribute('onclick', `toggleGroup('${roomKey}', event)`);
                 
-                const floorChevron = isFloorCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
+                const roomChevron = isRoomCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
                 
-                floorTr.innerHTML = `
-                    <td colspan="4" class="floor-header-cell" style="padding-left: 2rem !important; font-size: 0.9rem;">
+                roomTr.innerHTML = `
+                    <td colspan="4" class="room-header-cell" style="padding-left: 2rem !important; font-size: 0.85rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             <div>
-                                <i class="fa-solid ${floorChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                                <i class="fa-solid fa-layer-group"></i> Floor: ${floor}
-                            </div>
-                            <div style="display: flex; gap: 0.75rem; font-size: 0.7rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
-                                <button class="header-action-link" onclick="toggleSubGroups('domain-floor', '${domain.replace(/'/g, "\\'")}:${floor.replace(/'/g, "\\'")}', true, event)" title="Collapse all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                    <i class="fa-solid fa-angles-up"></i> Collapse Rooms
-                                </button>
-                                <button class="header-action-link" onclick="toggleSubGroups('domain-floor', '${domain.replace(/'/g, "\\'")}:${floor.replace(/'/g, "\\'")}', false, event)" title="Expand all rooms under this floor" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                    <i class="fa-solid fa-angles-down"></i> Expand Rooms
-                                </button>
+                                <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
+                                <i class="fa-solid fa-door-open"></i> ${room}
                             </div>
                         </div>
                     </td>
                 `;
-                entityTableBody.appendChild(floorTr);
+                entityTableBody.appendChild(roomTr);
                 
-                if (isFloorCollapsed) return;
+                if (isRoomCollapsed) return;
                 
-                const roomsInFloor = floorsInDomain[floor];
-                const sortedRooms = Object.keys(roomsInFloor).sort((a, b) => {
-                    if (a === 'No Room' || a === 'TBA') return 1;
-                    if (b === 'No Room' || b === 'TBA') return -1;
-                    return a.localeCompare(b);
-                });
+                const ents = roomsInDomain[room];
+                ents.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
                 
-                sortedRooms.forEach(room => {
-                    const roomKey = `room:${domain}:${floor}:${room}`;
-                    const isRoomCollapsed = collapsedGroups.has(roomKey);
-                    
-                    // Room Header under Floor
-                    const roomTr = document.createElement('tr');
-                    roomTr.className = 'room-header-row';
-                    roomTr.style.cursor = 'pointer';
-                    roomTr.setAttribute('onclick', `toggleGroup('${roomKey}', event)`);
-                    
-                    const roomChevron = isRoomCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
-                    
-                    roomTr.innerHTML = `
-                        <td colspan="4" class="room-header-cell" style="padding-left: 3rem !important; font-size: 0.85rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                <div>
-                                    <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                                    <i class="fa-solid fa-door-open"></i> ${room}
-                                </div>
-                                <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
-                                    <button class="header-action-link" onclick="openAiAssist('room', '${domain.replace(/'/g, "\\'")}:${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', event)" title="AI Assist for this Room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Assist
-                                    </button>
-                                </div>
-                            </div>
-                        </td>
-                    `;
-                    entityTableBody.appendChild(roomTr);
-                    
-                    if (isRoomCollapsed) return;
-                    
-                    const ents = roomsInFloor[room];
-                    ents.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
-                    
-                    ents.forEach(e => {
-                        renderEntityRow(e);
-                    });
+                ents.forEach(e => {
+                    renderEntityRow(e);
                 });
             });
         });
     } else {
-        // Group entities by floor, then by room, then by domain (Default Floor-first grouping)
+        // Group entities by floor, then by room (Default Floor-first grouping)
         const groups = {};
         filteredEntities.forEach(e => {
             const floor = e.floor || 'No Floor';
             const room = e.area || 'No Room';
-            const domain = e.domain || 'No Domain';
             if (!groups[floor]) {
                 groups[floor] = {};
             }
             if (!groups[floor][room]) {
-                groups[floor][room] = {};
+                groups[floor][room] = [];
             }
-            if (!groups[floor][room][domain]) {
-                groups[floor][room][domain] = [];
-            }
-            groups[floor][room][domain].push(e);
+            groups[floor][room].push(e);
         });
         
         // Sort floor names (put "No Floor" or "TBA" at the end)
@@ -666,7 +604,7 @@ function renderTable() {
                 const roomChevron = isRoomCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
                 
                 roomTr.innerHTML = `
-                    <td colspan="4" class="room-header-cell">
+                    <td colspan="4" class="room-header-cell" style="padding-left: 2rem !important;">
                         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             <div>
                                 <i class="fa-solid ${roomChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
@@ -675,12 +613,6 @@ function renderTable() {
                             <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
                                 <button class="header-action-link" onclick="openAiAssist('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', event)" title="AI Assist for this Room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> AI Assist
-                                </button>
-                                <button class="header-action-link" onclick="toggleSubGroups('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', true, event)" title="Collapse all domains under this room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                    <i class="fa-solid fa-angles-up"></i> Collapse Domains
-                                </button>
-                                <button class="header-action-link" onclick="toggleSubGroups('room', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}', false, event)" title="Expand all domains under this room" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                    <i class="fa-solid fa-angles-down"></i> Expand Domains
                                 </button>
                             </div>
                         </div>
@@ -692,48 +624,16 @@ function renderTable() {
                     return;
                 }
                 
-                const domainsInRoom = roomsInFloor[room];
-                const domainKeys = Object.keys(domainsInRoom).sort();
+                const ents = roomsInFloor[room];
+                // Sort entities by domain first, then by entity_id
+                ents.sort((a, b) => {
+                    const domainComp = (a.domain || '').localeCompare(b.domain || '');
+                    if (domainComp !== 0) return domainComp;
+                    return a.entity_id.localeCompare(b.entity_id);
+                });
                 
-                domainKeys.forEach(domain => {
-                    const domainKey = `domain:${floor}:${room}:${domain}`;
-                    const isDomainCollapsed = collapsedGroups.has(domainKey);
-                    
-                    // Render Domain Header row
-                    const domainTr = document.createElement('tr');
-                    domainTr.className = 'domain-header-row';
-                    domainTr.style.cursor = 'pointer';
-                    domainTr.setAttribute('onclick', `toggleGroup('${domainKey}', event)`);
-                    
-                    const domainChevron = isDomainCollapsed ? 'fa-chevron-right' : 'fa-chevron-down';
-                    
-                    domainTr.innerHTML = `
-                        <td colspan="4" class="domain-header-cell" style="padding-left: 2rem !important; font-size: 0.85rem; font-weight: 600; color: var(--outline);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                <div>
-                                    <i class="fa-solid ${domainChevron}" style="margin-right: 0.5rem; width: 12px;"></i>
-                                    <i class="fa-solid ${getEntityIcon(domain)}" style="margin-right: 0.25rem;"></i> ${getDomainName(domain)}
-                                </div>
-                                <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; font-weight: normal; text-transform: none; letter-spacing: normal;">
-                                    <button class="header-action-link" onclick="openAiAssist('domain', '${floor.replace(/'/g, "\\'")}:${room.replace(/'/g, "\\'")}:${domain.replace(/'/g, "\\'")}', event)" title="AI Assist for this Domain" style="background: none; border: none; color: var(--primary); cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
-                                        <i class="fa-solid fa-wand-magic-sparkles"></i> AI Assist
-                                    </button>
-                                </div>
-                            </div>
-                        </td>
-                    `;
-                    entityTableBody.appendChild(domainTr);
-                    
-                    if (isDomainCollapsed) {
-                        return;
-                    }
-                    
-                    const ents = domainsInRoom[domain];
-                    ents.sort((a, b) => a.entity_id.localeCompare(b.entity_id));
-                    
-                    ents.forEach(e => {
-                        renderEntityRow(e);
-                    });
+                ents.forEach(e => {
+                    renderEntityRow(e);
                 });
             });
         });
