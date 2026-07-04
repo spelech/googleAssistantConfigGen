@@ -239,9 +239,12 @@ async def async_fetch_entities_data(hass: HomeAssistant):
         # Compare with what is in the yaml file
         yaml_exp = entity_id in yaml_exposed
 
-        # Clean/filter aliases
+        # Clean/filter aliases (strictly allow only valid string values)
         raw_aliases = entry.aliases or []
-        clean_aliases = [a for a in raw_aliases if a and a != "0" and a != 0]
+        clean_aliases = [
+            str(a) for a in raw_aliases
+            if a and isinstance(a, str) and a != "0" and a != 0
+        ]
 
         platform = entry.platform or ""
         device_class = entry.device_class or ""

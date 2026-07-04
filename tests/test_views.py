@@ -156,3 +156,58 @@ async def test_async_call_llm_home_assistant(mock_hass):
         response_text = await async_call_llm(mock_hass, "Test prompt", test_settings)
         assert response_text == "cooking light, kitchen main"
         mock_converse.assert_called_once()
+
+
+@pytest.mark.anyio
+async def test_computed_name_handling(mock_hass):
+    from custom_components.google_assistant_entity_console.views import async_fetch_entities_data
+    
+    # Mock some dummy enum or class instance that resembles ComputedNameType._singleton
+    class MockComputedNameType:
+        def __str__(self):
+            return "<ComputedNameType._singleton: 0>"
+    
+    dummy_computed_name = MockComputedNameType()
+    
+    # Setup mock registries
+    mock_ent_reg = MagicMock()
+    mock_entry = MagicMock()
+    mock_entry.entity_id = "light.kitchen"
+    mock_entry.disabled_by = None
+    mock_entry.hidden_by = None
+    mock_entry.device_id = "dev_123"
+    mock_entry.device_class = None
+    mock_entry.original_device_class = None
+    mock_entry.area_id = None
+    
+    # Set COMPUTED_NAME singleton value on name and original_name and raw aliases
+    mock_entry.name = dummy_computed_name
+    mock_entry.original_name = dummy_computed_name
+    mock_entry.aliases = [dummy_computed_name, "kitchen_alias"]
+    mock_entry.options = {}
+    mock_entry.platform = "hue"
+    
+    mock_ent_reg.entities = {"light.kitchen": mock_entry}
+    
+    mock_dev_reg = MagicMock()
+    mock_dev = MagicMock()
+    mock_dev.id = "dev_123"
+    mock_dev.area_id = None
+    mock_dev.name_by_user = dummy_computed_name
+    mock_dev.name = dummy_computed_name
+    mock_dev_reg.devices = {"dev_123": mock_dev}
+    
+    with patch("custom_components.google_assistant_entity_console.views.entity_registry.async_get", return_value=mock_ent_reg), \
+         patch("custom_components.google_assistant_entity_console.views.device_registry.async_get", return_value=mock_dev_reg), \
+         patch("custom_components.google_assistant_entity_console.views.area_registry.async_get", return_value=MagicMock()), \
+         patch("custom_components.google_assistant_entity_console.views.floor_registry.async_get", return_value=MagicMock()), \
+         patch("custom_components.google_assistant_entity_console.views.get_current_yaml_filename", return_value="dummy.yaml"), \
+         patch("custom_components.google_assistant_entity_console.views.load_yaml_exposed_entities", return_value={}):
+        
+        entities = await async_fetch_entities_data(mock_hass)
+        assert len(entities) == 1
+        ent = entities[0]
+        # Should fallback to formatting the entity ID name part
+        assert ent["display_name"] == "Kitchen"
+        # The COMPUTED_NAME alias should be filtered out, leaving only the string alias
+        assert ent["aliases"] == ["kitchen_alias"]
