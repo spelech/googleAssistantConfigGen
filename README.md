@@ -37,23 +37,24 @@ It acts as a clean configuration manager, eliminating the need to write complex 
 
 ## Configuration
 
-To activate the integration and register the sidebar panel, add the following key to your `configuration.yaml` file:
+Once installed, configure the integration using the Home Assistant UI:
 
-```yaml
-google_assistant_entity_console:
-```
+1. In Home Assistant, go to **Settings** > **Devices & Services**.
+2. Click **Add Integration** in the bottom-right corner.
+3. Search for **Google Assistant Entity Console** and select it.
+4. Follow the prompt to complete the setup. 
 
-Restart Home Assistant to apply the configuration. A new **Google Sync** link will appear in your sidebar.
+A new **Google Sync** panel will automatically appear in your sidebar.
 
-### Connecting to Google Assistant
+### Linking with Google Assistant Integration
 
-Before generating configurations, make sure the built-in Google Assistant integration is configured and linked. Add a line referencing the configuration file in your main `configuration.yaml` matching this pattern:
+To link the generated YAML configuration file to Home Assistant's built-in Google Assistant integration, add an include statement pointing to the generated file in your main `configuration.yaml` file:
 
 ```yaml
 google_assistant: !include gaGen_062226.yaml
 ```
 
-The console will automatically detect, read, and write to the active configuration file.
+The console will automatically read, update, and rewrite to this configuration file on rebuild.
 
 ## Screenshot Previews
 
