@@ -16,6 +16,7 @@ const exposedOnlyCheckbox = document.getElementById('exposedOnlyCheckbox');
 const toggleAdvancedFiltersBtn = document.getElementById('toggleAdvancedFiltersBtn');
 const advancedFiltersDrawer = document.getElementById('advancedFiltersDrawer');
 const hideGroupedLightsCheckbox = document.getElementById('hideGroupedLightsCheckbox');
+const hideUnavailableCheckbox = document.getElementById('hideUnavailableCheckbox');
 const domainChipsContainer = document.getElementById('domainChipsContainer');
 const selectedDomains = new Set();
 const entityTableBody = document.getElementById('entityTableBody');
@@ -130,6 +131,9 @@ function setupEventListeners() {
     if (hideGroupedLightsCheckbox) {
         hideGroupedLightsCheckbox.addEventListener('change', applyFilters);
     }
+    if (hideUnavailableCheckbox) {
+        hideUnavailableCheckbox.addEventListener('change', applyFilters);
+    }
     
     // Rebuild Button
     if (rebuildBtn) rebuildBtn.addEventListener('click', handleRebuild);
@@ -231,6 +235,7 @@ function applyFilters() {
     const room = roomFilter ? roomFilter.value : 'all';
     const exposedOnly = exposedOnlyCheckbox ? exposedOnlyCheckbox.checked : false;
     const hideGroupedLights = hideGroupedLightsCheckbox ? hideGroupedLightsCheckbox.checked : false;
+    const hideUnavailable = hideUnavailableCheckbox ? hideUnavailableCheckbox.checked : false;
     
     filteredEntities = entities.filter(e => {
         // Query match
@@ -251,7 +256,10 @@ function applyFilters() {
         // Hide Grouped Lights match
         const matchesGroupedLights = !hideGroupedLights || e.domain !== 'light' || !e.in_group;
         
-        return matchesQuery && matchesDomain && matchesRoom && matchesExposed && matchesGroupedLights;
+        // Hide Unavailable match
+        const matchesUnavailable = !hideUnavailable || !e.unavailable;
+        
+        return matchesQuery && matchesDomain && matchesRoom && matchesExposed && matchesGroupedLights && matchesUnavailable;
     });
     
     renderTable();
