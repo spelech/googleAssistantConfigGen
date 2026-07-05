@@ -368,35 +368,67 @@ class RebuildView(HomeAssistantView):
                 key=lambda x: (x["floor"] or "TBA", x["area"] or "TBA", x["domain"], x["entity_id"])
             )
 
-            entity_config = {}
+            yaml_lines = [
+                "project_id: !secret googleassistant_projectName",
+                "service_account: !include homeassistantdocker-3f199-994a25247393.json",
+                "report_state: true",
+                "secure_devices_pin: !secret google_device_pin",
+                "expose_by_default: false",
+                "entity_config:"
+            ]
+
+            current_floor = None
+            current_area = None
+            current_domain = None
+            exposed_count = 0
+
             for entity in sorted_entities:
-                if entity["should_expose"]:
-                    cfg = {
-                        "expose": True,
-                        "name": entity["display_name"]
-                    }
-                    if entity["aliases"]:
-                        cfg["aliases"] = entity["aliases"]
-                    if entity["area"] and entity["area"] != "TBA":
-                        cfg["room"] = entity["area"]
-                    entity_config[entity["entity_id"]] = cfg
+                if not entity["should_expose"]:
+                    continue
 
-            ga_config = {
-                "project_id": Secret("googleassistant_projectName"),
-                "service_account": Include("homeassistantdocker-3f199-994a25247393.json"),
-                "report_state": True,
-                "secure_devices_pin": Secret("google_device_pin"),
-                "expose_by_default": False,
-                "entity_config": entity_config
-            }
+                exposed_count += 1
+                
+                # Check for Floor transition
+                ent_floor = entity["floor"] or "TBA"
+                if ent_floor != current_floor:
+                    current_floor = ent_floor
+                    current_area = None
+                    current_domain = None
+                    yaml_lines.append(f"\n  # {'='*70}")
+                    yaml_lines.append(f"  # Floor: {current_floor}")
+                    yaml_lines.append(f"  # {'='*70}")
 
-            # Generate YAML
-            yaml_string = yaml.dump(ga_config, Dumper=yaml.SafeDumper, sort_keys=False, width=1000)
+                # Check for Area (Room) transition
+                ent_area = entity["area"] or "TBA"
+                if ent_area != current_area:
+                    current_area = ent_area
+                    current_domain = None
+                    yaml_lines.append(f"\n  # --- Room: {current_area} ---")
 
-            # Post-process to remove quotes from !secret and !include
-            cleaned_yaml = yaml_string
-            cleaned_yaml = re.sub(r"!secret '([^']+)'", r"!secret \1", cleaned_yaml)
-            cleaned_yaml = re.sub(r"!include '([^']+)'", r"!include \1", cleaned_yaml)
+                # Check for Domain transition
+                ent_domain = entity["domain"]
+                if ent_domain != current_domain:
+                    current_domain = ent_domain
+                    yaml_lines.append(f"  # Type: {current_domain.title()}")
+
+                # Dump this single entity config
+                cfg = {
+                    "expose": True,
+                    "name": entity["display_name"]
+                }
+                if entity["aliases"]:
+                    cfg["aliases"] = entity["aliases"]
+                if entity["area"] and entity["area"] != "TBA":
+                    cfg["room"] = entity["area"]
+
+                single_cfg = {entity["entity_id"]: cfg}
+                dumped = yaml.dump(single_cfg, Dumper=yaml.SafeDumper, sort_keys=False, width=1000)
+
+                for line in dumped.splitlines():
+                    if line.strip():
+                        yaml_lines.append(f"  {line}")
+
+            cleaned_yaml = "\n".join(yaml_lines) + "\n"
 
             # Syntax validation step
             class CustomLoader(yaml.SafeLoader):
@@ -433,7 +465,7 @@ class RebuildView(HomeAssistantView):
 
             return self.json({
                 "success": True,
-                "exposed_count": len(entity_config),
+                "exposed_count": exposed_count,
                 "yaml_written": filepath
             })
         except Exception as err:
