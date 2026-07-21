@@ -12,7 +12,7 @@ It operates entirely inside the Home Assistant process, combining an `aiohttp` H
 
 ```mermaid
 graph TD
-    subgraph Home Assistant Backend
+    subgraph HomeAssistantBackend ["Home Assistant Backend"]
         HARegistries["Entity, Device, Area & Floor Registries"]
         HACore["Home Assistant Core (States, Services)"]
         CustomComp["custom_components/google_assistant_entity_console"]
@@ -22,8 +22,8 @@ graph TD
         YAMLGen["Generated YAML (gaGen_YYMMDD.yaml)"]
     end
 
-    subgraph Frontend (Sidebar Panel)
-        PanelJS["panel.js (Web Component <google-assistant-entity-console-panel>)"]
+    subgraph FrontendSidebar ["Frontend (Sidebar Panel)"]
+        PanelJS["panel.js (Web Component panel)"]
         Iframe["Iframe Container (index.html)"]
         AppJS["app.js (UI Logic & State Management)"]
         StyleCSS["style.css (Material Design 3 + HA CSS Variables)"]
