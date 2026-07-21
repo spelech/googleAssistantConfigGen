@@ -50,9 +50,6 @@ Configuring entities exposed to Google Assistant in Home Assistant traditionally
 
 ## Screenshot Previews
 
-> [!NOTE]
-> All screenshots below are authentic captures from a live, running Home Assistant instance.
-
 ### Location-First Layout (`Floor -> Room -> Domain`)
 ![Location Grouping Preview](brand/dashboard_location_view.png)
 
