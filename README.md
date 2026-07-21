@@ -9,7 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="docs/DEMO_SETUP.md"><b>🌐 Interactive Live Demo</b></a> •
   <a href="#key-features">Key Features</a> •
   <a href="#installation">Installation</a> •
   <a href="#configuration">Configuration</a> •
@@ -120,7 +119,6 @@ Explore the detailed architecture and technical guides:
 - 🏗️ **[Architecture Overview](docs/ARCHITECTURE.md)**: Deep dive into `views.py`, entity registry resolution, YAML SafeDumper/SafeLoader engine, regex blocklisting, and iframe Web Component architecture.
 - 🤖 **[AI Integration Guide](docs/AI_INTEGRATION.md)**: Technical guide on OpenAI-compatible local/remote endpoints, HA Assist agent integration, and prompt customization.
 - 🎨 **[Dashboard Theme Integration](docs/THEMING.md)**: Technical breakdown of how the UI maps Home Assistant CSS variables (`--primary-background-color`, etc.) to Material Design 3 design tokens.
-- 🌐 **[Interactive Demo Setup](docs/DEMO_SETUP.md)**: How to host and run an interactive zero-backend live demo on GitHub Pages using dummy mock data.
 
 ---
 
