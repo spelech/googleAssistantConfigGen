@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Assistant Entity Console - Live Interactive Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../custom_components/google_assistant_entity_console/static/style.css">
+    <style>
+        .demo-banner {
+            background-color: var(--primary-container, #00458f);
+            color: var(--on-primary-container, #d6e2ff);
+            text-align: center;
+            padding: 0.6rem 1rem;
+            font-size: 0.88rem;
+            font-weight: 500;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            border: 1px solid var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Interactive Demo Banner -->
+        <div class="demo-banner">
+            <i class="fa-solid fa-flask"></i>
+            <span><strong>Interactive Community Demo Mode</strong> — Simulating live Home Assistant entity registry & AI backend with mock data.</span>
+        </div>
+
+        <!-- Header -->
+        <header>
+            <div class="logo">
+                <img src="../logo.png" style="width: 32px; height: 32px; border-radius: 8px; margin-right: 0.6rem; flex-shrink: 0;" alt="Google Assistant Entity Console Logo">
+                <div class="logo-text">
+                    <h1>Google Assistant</h1>
+                    <span id="appVersion">Entity Console</span>
+                </div>
+            </div>
+            <div class="header-actions" style="display: flex; gap: 0.75rem;">
+                <button id="openAiSettingsBtn" class="btn btn-secondary">
+                    <i class="fa-solid fa-robot"></i>
+                    <span>AI Settings</span>
+                </button>
+                <button id="manageBlocklistBtn" class="btn btn-secondary">
+                    <i class="fa-solid fa-ban"></i>
+                    <span>Manage Blocklist</span>
+                </button>
+                <button id="rebuildBtn" class="btn btn-primary">
+                    <i class="fa-solid fa-file-code"></i>
+                    <span>Rebuild Config</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Overview -->
+        <section class="stats-container">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fa-solid fa-list-check"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Total Entities</span>
+                    <h2 id="totalEntities">0</h2>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon success"><i class="fa-solid fa-eye"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Exposed to Google</span>
+                    <h2 id="exposedEntities">0</h2>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon info"><i class="fa-solid fa-file-lines"></i></div>
+                <div class="stat-content">
+                    <span class="stat-label">Active YAML Config</span>
+                    <h2 id="configFile" style="font-size: 1.1rem; word-break: break-all;">Loading...</h2>
+                </div>
+            </div>
+        </section>
+
+        <!-- Search and Controls -->
+        <section class="controls-card">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="searchInput" placeholder="Search by entity name, ID, domain, room, or nickname...">
+            </div>
+            <div class="filter-group">
+                <select id="roomFilter" class="select-input">
+                    <option value="">All Rooms / Areas</option>
+                </select>
+                <select id="groupingType" class="select-input">
+                    <option value="location">View: Location (Floor > Room > Domain)</option>
+                    <option value="domain">View: Domain (Domain > Floor > Room)</option>
+                </select>
+                <button id="toggleAdvancedFiltersBtn" class="btn btn-secondary btn-icon-only" title="Advanced Filters">
+                    <i class="fa-solid fa-filter"></i>
+                </button>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="exposedOnlyCheckbox">
+                    <span>Exposed only</span>
+                </label>
+            </div>
+        </section>
+
+        <!-- Advanced Filters Drawer -->
+        <div id="advancedFiltersDrawer" class="advanced-filters-drawer" style="display: none;">
+            <div class="drawer-header">
+                <h3><i class="fa-solid fa-sliders"></i> Advanced Domain & Sensor Filters</h3>
+            </div>
+            <div class="drawer-content">
+                <div class="filter-section">
+                    <label class="filter-section-title">Filter by Domain</label>
+                    <div id="domainChipsContainer" class="domain-chips-container"></div>
+                </div>
+                <div class="filter-section">
+                    <label class="filter-section-title">Special Options</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hideGroupedLightsCheckbox">
+                            <span>Hide individual lights inside light groups</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hideUnavailableCheckbox">
+                            <span>Hide unavailable / disabled entities</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Entity Console Table -->
+        <main class="table-container">
+            <table class="entity-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"></th>
+                        <th>Entity / Display Name</th>
+                        <th style="width: 140px;">Exposed</th>
+                        <th style="width: 250px;">Google Assistant Aliases (Nicknames)</th>
+                        <th style="width: 80px; text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="entityTableBody">
+                    <!-- Dynamic rendering by app.js -->
+                </tbody>
+            </table>
+        </main>
+    </div>
+
+    <!-- AI Settings Modal -->
+    <div id="aiSettingsModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-robot"></i> AI Assistant Integration</h2>
+                <button type="button" class="close-btn" id="closeAiSettingsModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>AI Provider Source</label>
+                    <select id="aiSourceSelect" class="select-input" style="width: 100%;">
+                        <option value="openai">OpenAI-Compatible Endpoint (LocalAI / Ollama / OpenAI / OpenRouter)</option>
+                        <option value="home_assistant">Home Assistant Native Conversation Agent (Assist)</option>
+                    </select>
+                </div>
+                
+                <div id="openaiSettingsGroup">
+                    <div class="form-group">
+                        <label>Base API URL</label>
+                        <input type="text" id="aiBaseUrl" class="text-input" placeholder="http://192.168.1.100:11434/v1">
+                    </div>
+                    <div class="form-group">
+                        <label>API Key (Optional for Local LLMs)</label>
+                        <input type="password" id="aiApiKey" class="text-input" placeholder="sk-...">
+                    </div>
+                    <div class="form-group">
+                        <label>Model Name</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <select id="aiModelSelect" class="select-input" style="flex: 1;"></select>
+                            <button type="button" id="fetchAiModelsBtn" class="btn btn-secondary">Fetch Models</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="haAgentSettingsGroup" style="display: none;">
+                    <div class="form-group">
+                        <label>Home Assistant Conversation Agent</label>
+                        <select id="haAgentSelect" class="select-input" style="width: 100%;"></select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="closeAiSettingsModal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveAiSettingsBtn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Assist Intent Modal -->
+    <div id="aiAssistModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-wand-magic-sparkles"></i> AI Exposure Assistant</h2>
+                <button type="button" class="close-btn" id="closeAiAssistModalX">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: var(--on-surface-variant); font-size: 0.9rem;">
+                    Describe what you want to expose to Google Assistant in plain English (e.g. <em>"Expose all bedroom lights and living room climate"</em>).
+                </p>
+                <div class="form-group">
+                    <textarea id="aiUserIntentInput" class="text-input" rows="3" placeholder="Enter your exposure intent..."></textarea>
+                </div>
+                <button type="button" id="submitAiIntentBtn" class="btn btn-primary" style="width: 100%;">
+                    <i class="fa-solid fa-paper-plane"></i> Analyze Intent & Select Entities
+                </button>
+            </div>
+            <div class="modal-actions" style="border-top: none; justify-content: flex-end;">
+                <button type="button" class="btn btn-secondary" id="closeAiAssistModalBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Aliases Modal -->
+    <div id="aliasModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-tags"></i> Edit Voice Nicknames</h2>
+                <button type="button" class="close-btn" id="closeAliasModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="aliasEntityName" style="font-weight: 500; margin-bottom: 0.75rem; color: var(--primary);"></p>
+                <div class="form-group">
+                    <label>Current Nicknames</label>
+                    <div id="aliasChipsContainer" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;"></div>
+                </div>
+                <div class="form-group" style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="newAliasInput" class="text-input" placeholder="Type nickname & press Add..." style="flex: 1;">
+                    <button type="button" id="addAliasBtn" class="btn btn-secondary">Add</button>
+                </div>
+                <button type="button" id="aiGenerateSingleNicknameBtn" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Generate Room-Aware Nicknames
+                </button>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="cancelAliasBtn">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveAliasBtn">Save Nicknames</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Blocklist Manager Modal -->
+    <div id="blocklistModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-ban"></i> Manage Entity Blocklist</h2>
+                <button type="button" class="close-btn" id="closeBlocklistModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 0.75rem; color: var(--on-surface-variant); font-size: 0.9rem;">
+                    Entities matching any regex pattern below are completely excluded from the dashboard and generated configuration.
+                </p>
+                <div class="form-group" style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="newBlocklistPattern" class="text-input" placeholder="e.g. .*_battery_level$" style="flex: 1;">
+                    <button type="button" id="addBlocklistPatternBtn" class="btn btn-primary">Add Pattern</button>
+                </div>
+                <div id="blocklistContainer" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto;"></div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="closeBlocklistModalBtn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Load App Script with Demo Flag -->
+    <script>
+        window.isDemoMode = true;
+    </script>
+    <script src="../custom_components/google_assistant_entity_console/static/app.js"></script>
+</body>
+</html>
